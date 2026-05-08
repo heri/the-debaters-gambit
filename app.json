@@ -6,7 +6,10 @@
     "orientation": "portrait",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.studiozenkai.debatersgambit"
+      "bundleIdentifier": "com.studiozenkai.debatersgambit",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.studiozenkai.debatersgambit"
