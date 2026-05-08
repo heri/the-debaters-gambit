@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "The Debater's Gambit",
+    "slug": "the-debaters-gambit",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.studiozenkai.debatersgambit"
+    },
+    "android": {
+      "package": "com.studiozenkai.debatersgambit"
+    }
+  }
+}
