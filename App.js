@@ -1,7 +1,8 @@
-// The Debater's Gambit — v3.0
+// The Debater's Gambit — v4.0
 // All screens, logic, and data live here intentionally. Refactor later.
 
 import React, { useState, useRef, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View, Text, TouchableOpacity, ScrollView, Animated,
   TextInput, KeyboardAvoidingView, StyleSheet,
@@ -12,17 +13,81 @@ import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
 const { width } = Dimensions.get('window');
 const CARD_W = Math.min(width * 0.88, 360);
-const DEBATE_SECS = 5 * 60; // 5 minutes
+const DEBATE_SECS = 5 * 60;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // CARD DATA — add cards by copying an existing entry
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const MOVE_CARDS = [
+  // ── BRONZE tier — easiest, character-inspired ──────────────────────────
   {
-    id: 'm1',
-    name: 'THE CHARMING BLUFF',
-    icon: '🗡️🎭',
+    id: 'm-b1', name: 'THE FAIR PLAY', icon: '🚩⚖️',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A0000', accent: '#F87171',
+    description:
+      'Appeal to fairness and the rules. State clearly what the right thing to do is — loudly and with total certainty. Make your opponent feel like they are breaking a rule that everyone already knows.',
+    inspiration: 'Hermione Granger',
+  },
+  {
+    id: 'm-b2', name: 'THE KIND HEART', icon: '🧥💗',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A0A12', accent: '#F9A8D4',
+    description:
+      'Speak slowly, warmly, and with total sincerity. Acknowledge your opponent\'s feelings first — then gently explain why your side is the kinder, more caring choice for everyone.',
+    inspiration: 'Mister Rogers',
+  },
+  {
+    id: 'm-b3', name: 'THE GOLDEN RULE', icon: '🪙🤝',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#0A1A15', accent: '#6EE7B7',
+    description:
+      'Find the deeper "why" behind the whole debate. Then show that following your argument is the brave, necessary thing to do — not just for yourself, but for everyone who comes after.',
+    inspiration: 'Moana',
+  },
+  {
+    id: 'm-b4', name: 'THE PINKY PROMISE', icon: '🤞✨',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A1200', accent: '#FCD34D',
+    description:
+      'Make a heartfelt, unbreakable promise that your position will lead to the best possible outcome. Speak with such earnest, total conviction that no one can doubt your sincerity.',
+    inspiration: 'Pinocchio (reformed)',
+  },
+  {
+    id: 'm-b5', name: 'THE TEAM', icon: '🐾⭐',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#000D1A', accent: '#93C5FD',
+    description:
+      'Forget "me vs. you." Show how your position helps everybody — the whole family, the whole class, the whole world. The best argument isn\'t the one that wins; it\'s the one that takes care of the team.',
+    inspiration: 'Paw Patrol',
+  },
+  {
+    id: 'm-b6', name: 'THE BEST FRIEND', icon: '🤠👢',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A0A00', accent: '#FDBA74',
+    description:
+      'Stick to your principles, no matter what. Calmly and loyally defend your position with the quiet confidence of someone who knows exactly who they are — no matter how much pressure is applied.',
+    inspiration: 'Woody',
+  },
+  {
+    id: 'm-b7', name: "THE LION'S COURAGE", icon: '🦁🌄',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A1200', accent: '#FDE68A',
+    description:
+      'Own your argument with royal confidence. If there are weaknesses in your position, admit them clearly — then show why you\'ve thought them through, and why your answer is still the right one.',
+    inspiration: 'Simba',
+  },
+  {
+    id: 'm-b8', name: 'BE RESPONSIBLE', icon: '⭐🛡️',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#0F001A', accent: '#C4B5FD',
+    description:
+      'Argue not just for what you want, but for what\'s good and fair for everyone around you. Show that choosing your side is the responsible, grown-up, caring thing to do.',
+    inspiration: 'Steven Universe',
+  },
+  // ── SILVER tier ────────────────────────────────────────────────────────
+  {
+    id: 'm1', name: 'THE CHARMING BLUFF', icon: '🗡️🎭',
     tier: 'SILVER', tierLabel: 'TACTICIAN',
     bg: '#1C2333', accent: '#A0AEC0',
     description:
@@ -30,9 +95,16 @@ const MOVE_CARDS = [
     inspiration: 'Locke Lamora',
   },
   {
-    id: 'm2',
-    name: 'PAINT THE FUTURE',
-    icon: '🌅🎨',
+    id: 'm3', name: 'THE HONEST TALE', icon: '🎩🪵',
+    tier: 'SILVER', tierLabel: 'STORYTELLER',
+    bg: '#1A1200', accent: '#C8A96E',
+    description:
+      'Instead of debating aggressively, tell a short, relatable, folksy story or fable. Frame your argument so it sounds like common sense and humble wisdom.',
+    inspiration: 'Abraham Lincoln',
+  },
+  // ── GOLD tier ──────────────────────────────────────────────────────────
+  {
+    id: 'm2', name: 'PAINT THE FUTURE', icon: '🌅🎨',
     tier: 'GOLD', tierLabel: 'ORATOR',
     bg: '#2D1B00', accent: '#ECC94B',
     description:
@@ -40,19 +112,7 @@ const MOVE_CARDS = [
     inspiration: 'Barack Obama',
   },
   {
-    id: 'm3',
-    name: 'THE HONEST TALE',
-    icon: '🎩🪵',
-    tier: 'SILVER', tierLabel: 'STORYTELLER',
-    bg: '#1A1200', accent: '#C8A96E',
-    description:
-      "Instead of debating aggressively, tell a short, relatable, folksy story or fable. Frame your argument so it sounds like common sense and humble wisdom.",
-    inspiration: 'Abraham Lincoln',
-  },
-  {
-    id: 'm4',
-    name: 'THE BRIDGE BUILDER',
-    icon: '🤝🧱',
+    id: 'm4', name: 'THE BRIDGE BUILDER', icon: '🤝🧱',
     tier: 'GOLD', tierLabel: 'MASTER',
     bg: '#001A10', accent: '#68D391',
     description:
@@ -64,8 +124,65 @@ const MOVE_CARDS = [
   //   bg: '#1A0000', accent: '#FC8181', description: '...', inspiration: 'Name' },
 ];
 
-// Cases are displayed sorted EASY → MEDIUM → HARD
+// Cases sorted EASY → MEDIUM → HARD
 const CASE_CARDS = [
+  // ── Kid-friendly EASY cases ────────────────────────────────────────────
+  {
+    id: 'c-k01', icon: '🦸📚', difficulty: 'EASY',
+    title: 'SUPERHEROES WOULD MAKE TERRIBLE TEACHERS',
+    description: "One side argues that flying, laser eyes, and saving the world make it impossible to run an orderly classroom. The other argues superpowers would make the best teachers imaginable.",
+  },
+  {
+    id: 'c-k02', icon: '🎮📝', difficulty: 'EASY',
+    title: 'VIDEO GAMES SHOULD COUNT AS HOMEWORK',
+    description: "One player argues that gaming builds real skills — strategy, reflexes, and teamwork — that belong in any school curriculum. The other defends the value of traditional homework.",
+  },
+  {
+    id: 'c-k03', icon: '🍦🧠', difficulty: 'EASY',
+    title: 'ICE CREAM FOR BREAKFAST WOULD MAKE KIDS SMARTER',
+    description: "One side argues happiness, sugar, and cold dairy first thing in the morning is the secret to a sharper brain. The other defends why breakfast rules exist.",
+  },
+  {
+    id: 'c-k04', icon: '🐶💛', difficulty: 'EASY',
+    title: "DOGS ARE TOO GOOD FOR US AND HUMANS DON'T DESERVE THEM",
+    description: "One player argues dogs are so loyal, so loving, and so patient that humanity has simply not earned them. The other defends humanity's worthiness of its best friend.",
+  },
+  {
+    id: 'c-k05', icon: '📚🌐', difficulty: 'EASY',
+    title: 'LIBRARIES ARE MORE POWERFUL THAN THE INTERNET',
+    description: "One side argues that silence, physical books, and a librarian's wisdom outperform any search engine. The other defends the limitless reach of the internet.",
+  },
+  {
+    id: 'c-k06', icon: '🦕🧐', difficulty: 'EASY',
+    title: 'DINOSAURS WERE SECRETLY MUCH SMARTER THAN WE THINK',
+    description: "One player builds the case for underestimated dinosaur intelligence. The other defends the scientific evidence as it stands.",
+  },
+  {
+    id: 'c-k07', icon: '🧦🛏️', difficulty: 'EASY',
+    title: 'WEARING SOCKS TO BED IS THE CORRECT WAY TO SLEEP',
+    description: "One side defends cosy, warm feet as the pinnacle of civilised bedtime behaviour. The other argues bare feet are the only acceptable option.",
+  },
+  {
+    id: 'c-k08', icon: '🌮📐', difficulty: 'EASY',
+    title: 'TACOS ARE MATHEMATICALLY THE PERFECT FOOD',
+    description: "One player builds a scientific and philosophical case for the taco as the peak of culinary engineering. The other challenges this audacious claim.",
+  },
+  {
+    id: 'c-k09', icon: '🚀👶', difficulty: 'EASY',
+    title: 'CHILDREN SHOULD BE FIRST IN LINE TO GO TO SPACE',
+    description: "One side argues kids are braver, more adaptable, and more curious — the perfect astronauts. The other defends why adults must lead the way.",
+  },
+  {
+    id: 'c-k10', icon: '🤖🏫', difficulty: 'EASY',
+    title: 'IF ROBOTS LIVE AMONG US THEY SHOULD HAVE TO GO TO SCHOOL',
+    description: "One player argues that robots need to learn the rules of society just like everyone else. The other challenges whether robots need school at all.",
+  },
+  {
+    id: 'c-k11', icon: '🦄🦴', difficulty: 'EASY',
+    title: 'UNICORNS WERE REAL ANIMALS THAT SIMPLY WENT EXTINCT',
+    description: "One side builds a compelling historical and scientific case for unicorns as real creatures. The other defends what we actually know about the fossil record.",
+  },
+  // ── Classic EASY cases ─────────────────────────────────────────────────
   {
     id: 'c1', icon: '🌙', difficulty: 'EASY',
     title: 'KIDS SHOULD DECIDE THEIR OWN BEDTIME',
@@ -86,11 +203,13 @@ const CASE_CARDS = [
     title: 'HOT DOGS TECHNICALLY AND LEGALLY COUNT AS SANDWICHES',
     description: "A battle of definitions and semantics. One player argues the hot dog is a sandwich. The other defends culinary tradition.",
   },
+  // ── MEDIUM cases ───────────────────────────────────────────────────────
   {
     id: 'c5', icon: '👽🌍', difficulty: 'MEDIUM', focus: 'Conspiracy vs. Logic',
     title: 'ALIENS DEFINITELY EXIST AND ARE CURRENTLY HIDING ON EARTH',
     description: "One player argues for the existence and presence of extraterrestrial life on Earth. The other defends logic and the burden of evidence.",
   },
+  // ── HARD cases ─────────────────────────────────────────────────────────
   {
     id: 'c6', icon: '🪄⚙️', difficulty: 'HARD', focus: 'Chaos vs. Order',
     title: 'A WORLD GOVERNED BY MAGIC WOULD BE WORSE THAN ONE GOVERNED BY TECHNOLOGY',
@@ -134,7 +253,6 @@ const Btn = ({ label, onPress, variant = 'primary', style, disabled }) => (
   </TouchableOpacity>
 );
 
-// Checkbox row used on the points screen
 const ToggleRow = ({ label, value, onToggle, pts }) => (
   <TouchableOpacity
     style={[S.toggleRow, value && S.toggleRowOn]}
@@ -185,7 +303,6 @@ const CaseCardView = ({ card }) => (
   </View>
 );
 
-// Full case banner shown during debate — no truncation
 const CaseBanner = ({ card }) => (
   <View style={S.caseBanner}>
     <Text style={S.caseBannerLabel}>THE CASE</Text>
@@ -194,9 +311,24 @@ const CaseBanner = ({ card }) => (
   </View>
 );
 
+// Compact row used in the inline move picker during debate
+const MovePickRow = ({ card, selected, onPress }) => (
+  <TouchableOpacity
+    style={[S.movePickRow, selected && { borderColor: card.accent, backgroundColor: card.bg }]}
+    onPress={onPress}
+    activeOpacity={0.8}
+  >
+    <Text style={S.movePickIcon}>{card.icon}</Text>
+    <View style={{ flex: 1 }}>
+      <Text style={[S.movePickName, selected && { color: card.accent }]}>{card.name}</Text>
+      <Text style={S.movePickTier}>{card.tier}  ·  {card.inspiration}</Text>
+    </View>
+    {selected ? <Text style={[S.movePickCheck, { color: card.accent }]}>✓</Text> : null}
+  </TouchableOpacity>
+);
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // TINDER-STYLE CARD BROWSER
-// Supports: swipe left/right, arrow buttons, random slot-machine animation
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const CardBrowser = ({ cards, renderCard, onChoose, showRandom, title, subtitle }) => {
@@ -220,7 +352,6 @@ const CardBrowser = ({ cards, renderCard, onChoose, showRandom, title, subtitle 
     });
   };
 
-  // These are defined per-render so they close over the current `idx`
   const goNext = () => {
     if (!isSpinning && idx < cards.length - 1) slide(1, () => setIdx(i => i + 1));
   };
@@ -228,7 +359,6 @@ const CardBrowser = ({ cards, renderCard, onChoose, showRandom, title, subtitle 
     if (!isSpinning && idx > 0) slide(-1, () => setIdx(i => i - 1));
   };
 
-  // Touch-based swipe: detect horizontal flick on the card
   const onTouchStart = e => { touchStartX.current = e.nativeEvent.pageX; };
   const onTouchEnd = e => {
     if (touchStartX.current === null || isSpinning) return;
@@ -238,12 +368,10 @@ const CardBrowser = ({ cards, renderCard, onChoose, showRandom, title, subtitle 
     else if (dx > 40) goPrev();
   };
 
-  // Slot-machine random: spin through cards with deceleration, land on target
   const handleRandom = () => {
     if (isSpinning) return;
     const targetIdx = Math.floor(Math.random() * cards.length);
     const stepsToTarget = (targetIdx - idx + cards.length) % cards.length;
-    // Always spin at least 2 full rounds so it feels random
     const totalSteps = 2 * cards.length + (stepsToTarget || cards.length);
     let step = 0;
     let cur = idx;
@@ -377,10 +505,9 @@ const HelpScreen = () => (
     </Text>
     <Text style={S.helpBody}>
       And Sol? Sol packed a small bag, took his sharpest moves, and disappeared
-      over the horizon. He charmed merchants, convinced warlords, and navigated
-      the courts of distant empires — returning with stories so extraordinary that
-      the whole kingdom went quiet to hear them. A life of adventure written
-      entirely in arguments won.
+      over the horizon — returning with stories so extraordinary that the whole
+      kingdom went quiet to hear them. A life of adventure written entirely in
+      arguments won.
     </Text>
 
     <View style={S.helpDivider} />
@@ -395,15 +522,14 @@ const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Pick a Move Card</Text> — each player secretly chooses a rhetorical
-        technique they must try to use.
+        <Text style={{ color: C.gold }}>Debate</Text> — each player gets 5 minutes with the timer running.
+        During your turn, pick a Move Card from the list on screen if you want — it earns you a bonus point if you use it.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Debate</Text> — each player gets 5 minutes. Make your case. There are no
-        wrong arguments, only weak ones.
+        <Text style={{ color: C.gold }}>After each round</Text> — choose to play another round or end the game and score.
       </Text>
     </View>
     <View style={S.helpRule}>
@@ -417,8 +543,8 @@ const HelpScreen = () => (
   </ScrollView>
 );
 
-// ── Account: player management + history ─────────────────────────────────
-const AccountScreen = ({ players, onAdd, onRemove, history }) => {
+// ── Account: player management + settings + history ───────────────────────
+const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRoundsChange, history, isOnboarding }) => {
   const [name, setName] = useState('');
 
   const submit = () => {
@@ -436,12 +562,25 @@ const AccountScreen = ({ players, onAdd, onRemove, history }) => {
         style={{ backgroundColor: C.bg }}
         keyboardShouldPersistTaps="handled"
       >
+        {isOnboarding ? (
+          <View style={S.onboardingBanner}>
+            <Text style={S.onboardingTitle}>👋 WELCOME!</Text>
+            <Text style={S.onboardingText}>
+              Add 2 players to get started. The game will launch automatically.
+            </Text>
+          </View>
+        ) : null}
+
         <Text style={S.screenTitle}>PLAYERS</Text>
 
         {players.map(p => (
           <View key={p.id} style={S.playerRow}>
             <Text style={S.playerRowName}>{p.name}</Text>
-            <TouchableOpacity onPress={() => onRemove(p.id)} style={S.removeBtn} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+            <TouchableOpacity
+              onPress={() => onRemove(p.id)}
+              style={S.removeBtn}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
               <Text style={S.removeTxt}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -463,9 +602,34 @@ const AccountScreen = ({ players, onAdd, onRemove, history }) => {
           </TouchableOpacity>
         </View>
 
+        <View style={S.sectionDivider} />
+        <Text style={S.screenTitle}>SETTINGS</Text>
+
+        <View style={S.settingRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={S.settingLabel}>DEFAULT ROUNDS</Text>
+            <Text style={S.settingSubLabel}>Rounds per game</Text>
+          </View>
+          <View style={S.stepper}>
+            <TouchableOpacity
+              style={S.stepBtn}
+              onPress={() => onRoundsChange(Math.max(1, defaultRounds - 1))}
+            >
+              <Text style={S.stepBtnTxt}>−</Text>
+            </TouchableOpacity>
+            <Text style={S.stepValue}>{defaultRounds}</Text>
+            <TouchableOpacity
+              style={S.stepBtn}
+              onPress={() => onRoundsChange(Math.min(10, defaultRounds + 1))}
+            >
+              <Text style={S.stepBtnTxt}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {history.length > 0 ? (
           <>
-            <View style={[S.sectionDivider]} />
+            <View style={S.sectionDivider} />
             <Text style={[S.screenTitle, { marginTop: 8 }]}>HISTORY</Text>
             {history.map(h => (
               <View key={h.id} style={S.historyItem}>
@@ -510,7 +674,7 @@ const PlayerPickScreen = ({ players, onConfirm }) => {
     } else if (sel.length < 2) {
       setSel([...sel, p]);
     } else {
-      setSel([sel[0], p]); // replace second pick
+      setSel([sel[0], p]);
     }
   };
 
@@ -569,10 +733,12 @@ const PassScreen = ({ name, onReady }) => (
   </View>
 );
 
-// ── Debate: live timer, full case, finish-early button ────────────────────
-const DebateScreen = ({ caseCard, move1, move2, player1, player2, onGameEnd }) => {
-  const [currentPlayer, setCurrentPlayer] = useState(1);
+// ── Debate: live timer + optional inline move picker ──────────────────────
+// Player chooses (or skips) a move card during their debate turn.
+// onDone(selectedMove | null) transitions to the next phase.
+const DebateScreen = ({ caseCard, player, nextPlayerName, onDone }) => {
   const [secondsLeft, setSecondsLeft] = useState(DEBATE_SECS);
+  const [selectedMove, setSelectedMove] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const intervalRef = useRef(null);
 
@@ -589,49 +755,55 @@ const DebateScreen = ({ caseCard, move1, move2, player1, player2, onGameEnd }) =
       });
     }, 1000);
     return () => clearInterval(intervalRef.current);
-  }, [currentPlayer, showModal]);
-
-  const switchToP2 = () => {
-    setCurrentPlayer(2);
-    setSecondsLeft(DEBATE_SECS);
-    setShowModal(false);
-  };
+  }, [showModal]);
 
   const tColor = timerColor(secondsLeft);
-  const currentMove = currentPlayer === 1 ? move1 : move2;
-  const currentName = (currentPlayer === 1 ? player1 : player2).name;
-  const nextName = (currentPlayer === 1 ? player2 : player1).name;
-  const isLastRound = currentPlayer === 2;
+
+  const toggleMove = card =>
+    setSelectedMove(prev => (prev?.id === card.id ? null : card));
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {/* Sticky timer banner */}
+      {/* Sticky timer + player name */}
       <View style={[S.timerBanner, { borderColor: tColor + '55', backgroundColor: tColor + '14' }]}>
         <Text style={[S.timerTxt, { color: tColor }]}>{formatTime(secondsLeft)}</Text>
         <View style={[S.playerChip, { backgroundColor: C.purple }]}>
-          <Text style={S.playerChipTxt}>{currentName.toUpperCase()}</Text>
+          <Text style={S.playerChipTxt}>{player.name.toUpperCase()}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={S.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Full case — no truncation */}
         <CaseBanner card={caseCard} />
 
-        {/* Scoring reminder */}
         <View style={S.scoringHint}>
           <Text style={S.scoringHintTxt}>
-            1 pt for winning  ·  +1 bonus if you use your move card
+            ⚔️  1 pt for winning  ·  ⭐ +1 pt if you use a move card
           </Text>
         </View>
 
-        <Text style={[S.screenLabel, { marginTop: 16 }]}>YOUR MOVE CARD</Text>
-        <MoveCardView card={currentMove} />
+        {/* Inline move picker */}
+        <Text style={[S.screenLabel, { marginTop: 20 }]}>
+          PICK A MOVE CARD — OPTIONAL  (+1 BONUS PT)
+        </Text>
 
-        <Text style={[S.screenLabel, { marginTop: 16 }]}>OPPONENT'S MOVE</Text>
-        <View style={S.faceDown}>
-          <Text style={{ fontSize: 40 }}>🃏</Text>
-          <Text style={S.faceDownLabel}>Revealed at scoring</Text>
-        </View>
+        {MOVE_CARDS.map(card => (
+          <MovePickRow
+            key={card.id}
+            card={card}
+            selected={selectedMove?.id === card.id}
+            onPress={() => toggleMove(card)}
+          />
+        ))}
+
+        {/* Selected move description */}
+        {selectedMove ? (
+          <View style={[S.movePickDesc, { borderColor: selectedMove.accent + '66', backgroundColor: selectedMove.bg }]}>
+            <Text style={[S.movePickDescTitle, { color: selectedMove.accent }]}>
+              {selectedMove.name}  ✦  {selectedMove.inspiration}
+            </Text>
+            <Text style={S.movePickDescText}>{selectedMove.description}</Text>
+          </View>
+        ) : null}
 
         <Btn
           label="✓  DONE — I'M FINISHED"
@@ -640,21 +812,20 @@ const DebateScreen = ({ caseCard, move1, move2, player1, player2, onGameEnd }) =
         />
       </ScrollView>
 
-      {/* Modal: timer end or finish-early */}
       {showModal ? (
         <View style={S.modalOverlay}>
           <View style={S.modalBox}>
             <Text style={S.modalTitle}>
-              {secondsLeft === 0 ? '⏱  TIME\'S UP!' : '✓  DONE!'}
+              {secondsLeft === 0 ? "⏱  TIME'S UP!" : '✓  DONE!'}
             </Text>
             <Text style={S.modalBody}>
-              {isLastRound
-                ? `Both players have spoken!\nTime to score the round.`
-                : `Great job, ${player1.name}!\nNow pass the phone to ${player2.name}.`}
+              {nextPlayerName
+                ? `Great job, ${player.name}!\nPass the phone to ${nextPlayerName}.`
+                : `${player.name} has spoken!\nTime to decide what's next.`}
             </Text>
             <Btn
-              label={isLastRound ? 'SCORE THE ROUND  →' : `PASS TO ${nextName.toUpperCase()}  →`}
-              onPress={isLastRound ? onGameEnd : switchToP2}
+              label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
+              onPress={() => onDone(selectedMove)}
             />
           </View>
         </View>
@@ -663,57 +834,137 @@ const DebateScreen = ({ caseCard, move1, move2, player1, player2, onGameEnd }) =
   );
 };
 
-// ── Points: allocate points, reveal both move cards ───────────────────────
-const PointsScreen = ({ player1, player2, move1, move2, caseCard, onSave }) => {
-  const [p1Won, setP1Won] = useState(false);
-  const [p1Move, setP1Move] = useState(false);
-  const [p2Won, setP2Won] = useState(false);
-  const [p2Move, setP2Move] = useState(false);
+// ── Round end: next round or score the game ───────────────────────────────
+const RoundEndScreen = ({ currentRound, defaultRounds, player1, player2, onNextRound, onEndGame }) => (
+  <View style={S.screen}>
+    <Text style={[S.screenLabel, { marginBottom: 8 }]}>ROUND {currentRound} COMPLETE</Text>
+    <Text style={S.heroTitle}>WELL{'\n'}FOUGHT!</Text>
+    <Text style={[S.hint, { marginTop: 16 }]}>
+      {player1.name} and {player2.name} have both spoken.{'\n'}What's next?
+    </Text>
+    <Btn
+      label={`⚔️  PLAY ROUND ${currentRound + 1}`}
+      onPress={onNextRound}
+      style={{ marginTop: 40 }}
+    />
+    <Btn
+      label="🏆  END GAME & SCORE"
+      variant="secondary"
+      onPress={onEndGame}
+    />
+    {defaultRounds > 1 ? (
+      <Text style={[S.hint, { marginTop: 16 }]}>Default: {defaultRounds} rounds per game</Text>
+    ) : null}
+  </View>
+);
 
-  const p1pts = (p1Won ? 1 : 0) + (p1Move ? 1 : 0);
-  const p2pts = (p2Won ? 1 : 0) + (p2Move ? 1 : 0);
+// ── Points: multi-round scoring + grand totals ────────────────────────────
+const PointsScreen = ({ player1, player2, roundHistory, caseCard, onSave }) => {
+  const [scores, setScores] = useState(
+    roundHistory.map(() => ({ p1Won: false, p1UsedMove: false, p2Won: false, p2UsedMove: false }))
+  );
+
+  const toggle = (roundIdx, field) =>
+    setScores(prev => prev.map((r, i) => i === roundIdx ? { ...r, [field]: !r[field] } : r));
+
+  const p1Total = scores.reduce((s, r) => s + (r.p1Won ? 1 : 0) + (r.p1UsedMove ? 1 : 0), 0);
+  const p2Total = scores.reduce((s, r) => s + (r.p2Won ? 1 : 0) + (r.p2UsedMove ? 1 : 0), 0);
+  const winner = p1Total > p2Total ? player1.name : p2Total > p1Total ? player2.name : null;
 
   return (
     <ScrollView
       contentContainerStyle={[S.scrollContent, { paddingTop: 60 }]}
       style={{ backgroundColor: C.bg }}
     >
-      <Text style={S.screenTitle}>ROUND RESULTS</Text>
+      <Text style={S.screenTitle}>FINAL RESULTS</Text>
       <Text style={[S.hint, { marginBottom: 24 }]} numberOfLines={2}>{caseCard.title}</Text>
 
-      {/* Move card reveal */}
-      <Text style={S.screenLabel}>MOVE CARDS PLAYED</Text>
-      <View style={S.moveRevealRow}>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={S.moveRevealName}>{player1.name}</Text>
-          <MoveCardView card={move1} compact />
-        </View>
-        <Text style={S.vsLabel}>VS</Text>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Text style={S.moveRevealName}>{player2.name}</Text>
-          <MoveCardView card={move2} compact />
-        </View>
-      </View>
+      {roundHistory.map((round, idx) => (
+        <View key={idx} style={[S.pointsSection, { marginBottom: 12 }]}>
+          <Text style={[S.screenLabel, { marginBottom: 12 }]}>
+            {roundHistory.length > 1 ? `ROUND ${round.roundNum}` : 'THE ROUND'}
+          </Text>
 
-      {/* Player 1 points */}
-      <View style={S.pointsSection}>
-        <Text style={S.pointsPlayerName}>{player1.name}</Text>
-        <ToggleRow label="Won the argument" value={p1Won} onToggle={() => setP1Won(v => !v)} pts={1} />
-        <ToggleRow label="Used their move card" value={p1Move} onToggle={() => setP1Move(v => !v)} pts={1} />
-        <Text style={S.pointsTotal}>{p1pts} point{p1pts !== 1 ? 's' : ''}</Text>
-      </View>
+          {/* Move card reveal */}
+          {(round.p1Move || round.p2Move) ? (
+            <View style={S.moveRevealRow}>
+              {round.p1Move ? (
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={S.moveRevealName}>{player1.name}</Text>
+                  <MoveCardView card={round.p1Move} compact />
+                </View>
+              ) : null}
+              {round.p1Move && round.p2Move ? (
+                <Text style={S.vsLabel}>VS</Text>
+              ) : null}
+              {round.p2Move ? (
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={S.moveRevealName}>{player2.name}</Text>
+                  <MoveCardView card={round.p2Move} compact />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
-      {/* Player 2 points */}
-      <View style={S.pointsSection}>
-        <Text style={S.pointsPlayerName}>{player2.name}</Text>
-        <ToggleRow label="Won the argument" value={p2Won} onToggle={() => setP2Won(v => !v)} pts={1} />
-        <ToggleRow label="Used their move card" value={p2Move} onToggle={() => setP2Move(v => !v)} pts={1} />
-        <Text style={S.pointsTotal}>{p2pts} point{p2pts !== 1 ? 's' : ''}</Text>
+          {/* P1 scoring */}
+          <Text style={[S.pointsPlayerName, { marginTop: 12 }]}>{player1.name}</Text>
+          <ToggleRow
+            label="Won the argument"
+            value={scores[idx].p1Won}
+            onToggle={() => toggle(idx, 'p1Won')}
+            pts={1}
+          />
+          {round.p1Move ? (
+            <ToggleRow
+              label={`Used move: ${round.p1Move.name}`}
+              value={scores[idx].p1UsedMove}
+              onToggle={() => toggle(idx, 'p1UsedMove')}
+              pts={1}
+            />
+          ) : null}
+
+          {/* P2 scoring */}
+          <Text style={[S.pointsPlayerName, { marginTop: 12 }]}>{player2.name}</Text>
+          <ToggleRow
+            label="Won the argument"
+            value={scores[idx].p2Won}
+            onToggle={() => toggle(idx, 'p2Won')}
+            pts={1}
+          />
+          {round.p2Move ? (
+            <ToggleRow
+              label={`Used move: ${round.p2Move.name}`}
+              value={scores[idx].p2UsedMove}
+              onToggle={() => toggle(idx, 'p2UsedMove')}
+              pts={1}
+            />
+          ) : null}
+        </View>
+      ))}
+
+      {/* Grand total */}
+      <View style={[S.pointsSection, { backgroundColor: '#1A1500', borderColor: '#E9C46A44', marginBottom: 8 }]}>
+        <Text style={[S.screenLabel, { marginBottom: 12 }]}>GRAND TOTAL</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={S.moveRevealName}>{player1.name}</Text>
+            <Text style={S.grandTotalPts}>{p1Total}</Text>
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={S.moveRevealName}>{player2.name}</Text>
+            <Text style={S.grandTotalPts}>{p2Total}</Text>
+          </View>
+        </View>
+        {winner ? (
+          <Text style={[S.screenTitle, { marginTop: 16, color: C.text }]}>🏆  {winner} WINS!</Text>
+        ) : (p1Total > 0 || p2Total > 0) ? (
+          <Text style={[S.screenTitle, { marginTop: 16, color: C.muted }]}>IT'S A TIE!</Text>
+        ) : null}
       </View>
 
       <Btn
         label="SAVE RESULTS"
-        onPress={() => onSave(p1pts, p2pts)}
+        onPress={() => onSave(p1Total, p2Total)}
         style={{ marginTop: 8, marginBottom: 48 }}
       />
     </ScrollView>
@@ -748,41 +999,129 @@ const BottomNav = ({ activeTab, onTabPress }) => (
 );
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// APP — GAME STATE MACHINE
-// Phases: pick_players → pick_case → p1_pick_move → pass_to_p2
-//         → p2_pick_move → debate → points
+// APP — STATE MACHINE
+// Phases: pick_players → pick_case → debate_p1 → pass_to_p2
+//         → debate_p2 → round_end → debate_p1 (next round) | points
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function App() {
+  // Startup / persistence
+  const [isReady, setIsReady] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+
+  // Navigation
   const [activeTab, setActiveTab] = useState('home');
+
+  // Persisted
+  const [players, setPlayers] = useState([]);
+  const [defaultRounds, setDefaultRounds] = useState(1);
+
+  // Per-game
   const [gamePhase, setGamePhase] = useState('pick_players');
-
-  // Persistent player roster
-  const [players, setPlayers] = useState([
-    { id: uid(), name: 'Player 1' },
-    { id: uid(), name: 'Player 2' },
-  ]);
-
-  // Per-game state
   const [player1, setPlayer1] = useState(null);
   const [player2, setPlayer2] = useState(null);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [move1, setMove1] = useState(null);
-  const [move2, setMove2] = useState(null);
+  const [currentRound, setCurrentRound] = useState(1);
+  const [currentP1Move, setCurrentP1Move] = useState(null);
+  const [currentP2Move, setCurrentP2Move] = useState(null);
+  const [roundHistory, setRoundHistory] = useState([]);
 
-  // History persists across games
+  // In-memory across games
   const [history, setHistory] = useState([]);
 
+  // ── AsyncStorage load on mount ─────────────────────────────────────────
+  useEffect(() => {
+    AsyncStorage.multiGet(['players', 'settings']).then(results => {
+      const playersRaw = results[0][1];
+      const settingsRaw = results[1][1];
+
+      if (playersRaw) {
+        const saved = JSON.parse(playersRaw);
+        setPlayers(saved);
+        if (saved.length < 2) { setIsOnboarding(true); setActiveTab('account'); }
+      } else {
+        setIsOnboarding(true);
+        setActiveTab('account');
+      }
+
+      if (settingsRaw) {
+        const s = JSON.parse(settingsRaw);
+        if (s.defaultRounds) setDefaultRounds(s.defaultRounds);
+      }
+
+      setIsReady(true);
+    }).catch(() => setIsReady(true));
+  }, []);
+
+  // ── Persist players whenever they change ───────────────────────────────
+  useEffect(() => {
+    if (!isReady) return;
+    AsyncStorage.setItem('players', JSON.stringify(players)).catch(() => {});
+  }, [players, isReady]);
+
+  // ── Persist settings whenever defaultRounds changes ────────────────────
+  useEffect(() => {
+    if (!isReady) return;
+    AsyncStorage.setItem('settings', JSON.stringify({ defaultRounds })).catch(() => {});
+  }, [defaultRounds, isReady]);
+
+  // ── Player management ──────────────────────────────────────────────────
+  const handleAddPlayer = name => {
+    const newPlayer = { id: uid(), name };
+    const updated = [...players, newPlayer];
+    setPlayers(updated);
+    if (isOnboarding && updated.length >= 2) {
+      setIsOnboarding(false);
+      setActiveTab('game');
+    }
+  };
+
+  const handleRemovePlayer = id => {
+    setPlayers(prev => prev.filter(p => p.id !== id));
+  };
+
+  // ── Game management ────────────────────────────────────────────────────
   const resetGame = () => {
     setGamePhase('pick_players');
     setPlayer1(null); setPlayer2(null);
     setSelectedCase(null);
-    setMove1(null); setMove2(null);
+    setCurrentRound(1);
+    setCurrentP1Move(null); setCurrentP2Move(null);
+    setRoundHistory([]);
   };
 
   const handleTabPress = tab => {
     if (tab === 'game') resetGame();
     setActiveTab(tab);
+  };
+
+  const handleP1Done = move => {
+    setCurrentP1Move(move);
+    setGamePhase('pass_to_p2');
+  };
+
+  const handleP2Done = move => {
+    setCurrentP2Move(move);
+    setGamePhase('round_end');
+  };
+
+  const handleNextRound = () => {
+    setRoundHistory(prev => [
+      ...prev,
+      { roundNum: currentRound, p1Move: currentP1Move, p2Move: currentP2Move },
+    ]);
+    setCurrentRound(r => r + 1);
+    setCurrentP1Move(null);
+    setCurrentP2Move(null);
+    setGamePhase('debate_p1');
+  };
+
+  const handleEndGame = () => {
+    setRoundHistory(prev => [
+      ...prev,
+      { roundNum: currentRound, p1Move: currentP1Move, p2Move: currentP2Move },
+    ]);
+    setGamePhase('points');
   };
 
   const handleSavePoints = (p1pts, p2pts) => {
@@ -799,16 +1138,31 @@ export default function App() {
     resetGame();
   };
 
+  // ── Splash while loading ───────────────────────────────────────────────
+  if (!isReady) {
+    return (
+      <SafeAreaView style={S.safe}>
+        <ExpoStatusBar style="light" />
+        <View style={S.screen}>
+          <Text style={S.heroTitle}>THE{'\n'}DEBATER'S{'\n'}GAMBIT</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Content renderer ───────────────────────────────────────────────────
   const renderContent = () => {
-    // Static tabs
     if (activeTab === 'home') return <HomeScreen />;
     if (activeTab === 'help') return <HelpScreen />;
     if (activeTab === 'account') return (
       <AccountScreen
         players={players}
-        onAdd={name => setPlayers(p => [...p, { id: uid(), name }])}
-        onRemove={id => setPlayers(p => p.filter(x => x.id !== id))}
+        onAdd={handleAddPlayer}
+        onRemove={handleRemovePlayer}
+        defaultRounds={defaultRounds}
+        onRoundsChange={setDefaultRounds}
         history={history}
+        isOnboarding={isOnboarding}
       />
     );
 
@@ -830,50 +1184,49 @@ export default function App() {
           <CardBrowser
             cards={sortedCases}
             renderCard={card => <CaseCardView card={card} />}
-            onChoose={card => { setSelectedCase(card); setGamePhase('p1_pick_move'); }}
+            onChoose={card => { setSelectedCase(card); setGamePhase('debate_p1'); }}
             showRandom
             title="CHOOSE A CASE"
             subtitle={`${player1?.name}  vs  ${player2?.name}  ·  easiest first`}
           />
         );
 
-      case 'p1_pick_move':
+      case 'debate_p1':
         return (
-          <CardBrowser
-            cards={MOVE_CARDS}
-            renderCard={card => <MoveCardView card={card} />}
-            onChoose={card => { setMove1(card); setGamePhase('pass_to_p2'); }}
-            showRandom={false}
-            title={player1?.name.toUpperCase()}
-            subtitle="Choose your move card"
+          <DebateScreen
+            key={`p1-round${currentRound}`}
+            caseCard={selectedCase}
+            player={player1}
+            nextPlayerName={player2?.name}
+            currentRound={currentRound}
+            onDone={handleP1Done}
           />
         );
 
       case 'pass_to_p2':
-        return <PassScreen name={player2?.name} onReady={() => setGamePhase('p2_pick_move')} />;
+        return <PassScreen name={player2?.name} onReady={() => setGamePhase('debate_p2')} />;
 
-      case 'p2_pick_move':
+      case 'debate_p2':
         return (
-          <CardBrowser
-            cards={MOVE_CARDS}
-            renderCard={card => <MoveCardView card={card} />}
-            onChoose={card => { setMove2(card); setGamePhase('debate'); }}
-            showRandom={false}
-            title={player2?.name.toUpperCase()}
-            subtitle="Choose your move card"
+          <DebateScreen
+            key={`p2-round${currentRound}`}
+            caseCard={selectedCase}
+            player={player2}
+            nextPlayerName={null}
+            currentRound={currentRound}
+            onDone={handleP2Done}
           />
         );
 
-      case 'debate':
+      case 'round_end':
         return (
-          <DebateScreen
-            key={selectedCase?.id}
-            caseCard={selectedCase}
-            move1={move1}
-            move2={move2}
+          <RoundEndScreen
+            currentRound={currentRound}
+            defaultRounds={defaultRounds}
             player1={player1}
             player2={player2}
-            onGameEnd={() => setGamePhase('points')}
+            onNextRound={handleNextRound}
+            onEndGame={handleEndGame}
           />
         );
 
@@ -882,8 +1235,7 @@ export default function App() {
           <PointsScreen
             player1={player1}
             player2={player2}
-            move1={move1}
-            move2={move2}
+            roundHistory={roundHistory}
             caseCard={selectedCase}
             onSave={handleSavePoints}
           />
@@ -1075,13 +1427,21 @@ const S = StyleSheet.create({
   playerChip: { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8 },
   playerChipTxt: { color: '#F2EDD7', fontWeight: '800', fontSize: 13, letterSpacing: 2 },
 
-  // Face-down card
-  faceDown: {
-    width: CARD_W, height: 110, backgroundColor: '#111124',
-    borderRadius: 16, borderWidth: 1, borderColor: '#1E2235',
-    alignItems: 'center', justifyContent: 'center', marginVertical: 8,
+  // Inline move picker (during debate)
+  movePickRow: {
+    flexDirection: 'row', alignItems: 'center', width: CARD_W,
+    backgroundColor: '#111124', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12,
+    marginVertical: 3, borderWidth: 1, borderColor: '#1E2235',
   },
-  faceDownLabel: { color: '#667788', fontSize: 12, marginTop: 8, letterSpacing: 1 },
+  movePickIcon: { fontSize: 22, marginRight: 10, minWidth: 36, textAlign: 'center' },
+  movePickName: { fontSize: 13, fontWeight: '700', color: '#F2EDD7' },
+  movePickTier: { fontSize: 10, color: '#667788', letterSpacing: 0.8, marginTop: 2 },
+  movePickCheck: { fontSize: 18, fontWeight: '900', marginLeft: 8 },
+  movePickDesc: {
+    width: CARD_W, borderRadius: 12, padding: 14, marginTop: 4, marginBottom: 8, borderWidth: 1,
+  },
+  movePickDescTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
+  movePickDescText: { fontSize: 13, color: 'rgba(242,237,215,0.85)', lineHeight: 20 },
 
   // Modal
   modalOverlay: {
@@ -1098,7 +1458,7 @@ const S = StyleSheet.create({
   // Points screen
   moveRevealRow: {
     flexDirection: 'row', width: CARD_W, alignItems: 'flex-start',
-    marginVertical: 12, gap: 8,
+    marginVertical: 8, gap: 8,
   },
   moveRevealName: { fontSize: 12, fontWeight: '700', color: '#E9C46A', letterSpacing: 1, marginBottom: 4, textAlign: 'center' },
   vsLabel: { fontSize: 16, fontWeight: '900', color: '#667788', alignSelf: 'center', marginTop: 40 },
@@ -1107,13 +1467,9 @@ const S = StyleSheet.create({
     padding: 16, marginVertical: 8, borderWidth: 1, borderColor: '#1E2235',
   },
   pointsPlayerName: {
-    fontSize: 18, fontWeight: '800', color: '#E9C46A',
-    letterSpacing: 1, marginBottom: 12,
+    fontSize: 18, fontWeight: '800', color: '#E9C46A', letterSpacing: 1, marginBottom: 8,
   },
-  pointsTotal: {
-    fontSize: 16, fontWeight: '800', color: '#F2EDD7',
-    marginTop: 12, textAlign: 'right', letterSpacing: 0.5,
-  },
+  grandTotalPts: { fontSize: 48, fontWeight: '900', color: '#E9C46A', marginTop: 4 },
 
   // Account — player management
   playerRow: {
@@ -1141,6 +1497,31 @@ const S = StyleSheet.create({
   sectionDivider: {
     width: CARD_W, height: 1, backgroundColor: '#1E2235', marginVertical: 28,
   },
+
+  // Account — settings
+  settingRow: {
+    flexDirection: 'row', alignItems: 'center', width: CARD_W,
+    backgroundColor: '#111124', borderRadius: 14, padding: 16,
+    borderWidth: 1, borderColor: '#1E2235', marginVertical: 6,
+  },
+  settingLabel: { fontSize: 13, fontWeight: '800', color: '#F2EDD7', letterSpacing: 1 },
+  settingSubLabel: { fontSize: 11, color: '#667788', marginTop: 2 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepBtn: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: '#1E2235',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepBtnTxt: { color: '#E9C46A', fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  stepValue: { fontSize: 22, fontWeight: '900', color: '#E9C46A', minWidth: 28, textAlign: 'center' },
+
+  // Onboarding banner
+  onboardingBanner: {
+    width: CARD_W, backgroundColor: '#130926', borderRadius: 14,
+    padding: 20, marginBottom: 24, borderWidth: 1.5, borderColor: '#6B2FBE',
+    alignItems: 'center',
+  },
+  onboardingTitle: { fontSize: 20, fontWeight: '900', color: '#E9C46A', letterSpacing: 2, marginBottom: 8 },
+  onboardingText: { fontSize: 14, color: 'rgba(242,237,215,0.8)', textAlign: 'center', lineHeight: 22 },
 
   // History
   historyItem: {
