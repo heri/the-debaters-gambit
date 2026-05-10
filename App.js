@@ -1,14 +1,14 @@
-// The Debater's Gambit — v4.0
+// The Debater's Gambit — v4.1
 // App.js is the state machine and persistence layer only.
 // Card data → data.js  |  Styles → styles.js  |  Components → components.js  |  Screens → screens.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
-import { uid, sortedCases } from './data';
+import { uid, sortedCases, getDailyDraw, dealMoveCards } from './data';
 import { S } from './styles';
 import { CardBrowser, CaseCardView, BottomNav } from './components';
 import {
@@ -18,8 +18,14 @@ import {
 } from './screens';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GAME PHASES
-// pick_players → pick_case → debate_p1 → pass_to_p2
+// GAME MODES
+//   'daily'    – case + single move card pre-seeded by today's date.
+//                Launched from the Home screen Quick Draw button.
+//   'new_case' – user browses and picks a case; each player is dealt 2 move
+//                cards (NOVICE only until 10 games in history).
+//
+// GAME PHASES (shared by both modes)
+//   pick_players → pick_case (new_case only) → debate_p1 → pass_to_p2
 //   → debate_p2 → round_end → debate_p1 (next round) | points
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -36,10 +42,12 @@ export default function App() {
   const [defaultRounds, setDefaultRounds] = useState(1);
 
   // Per-game
+  const [gameMode, setGameMode] = useState('new_case'); // 'daily' | 'new_case'
   const [gamePhase, setGamePhase] = useState('pick_players');
   const [player1, setPlayer1] = useState(null);
   const [player2, setPlayer2] = useState(null);
   const [selectedCase, setSelectedCase] = useState(null);
+  const [availableMoves, setAvailableMoves] = useState([]); // cards dealt for this game
   const [currentRound, setCurrentRound] = useState(1);
   const [currentP1Move, setCurrentP1Move] = useState(null);
   const [currentP2Move, setCurrentP2Move] = useState(null);
@@ -47,6 +55,9 @@ export default function App() {
 
   // In-memory across games
   const [history, setHistory] = useState([]);
+
+  // Daily draw is stable for the session (date doesn't change mid-game)
+  const dailyDraw = useMemo(() => getDailyDraw(), []);
 
   // ── Load from AsyncStorage on mount ─────────────────────────────────────
   useEffect(() => {
@@ -96,17 +107,28 @@ export default function App() {
   const handleRemovePlayer = id => setPlayers(prev => prev.filter(p => p.id !== id));
 
   // ── Game management ──────────────────────────────────────────────────────
-  const resetGame = () => {
+  const resetGame = (mode = 'new_case') => {
+    setGameMode(mode);
     setGamePhase('pick_players');
     setPlayer1(null); setPlayer2(null); setSelectedCase(null);
+    setAvailableMoves([]);
     setCurrentRound(1);
     setCurrentP1Move(null); setCurrentP2Move(null);
     setRoundHistory([]);
   };
 
   const handleTabPress = tab => {
-    if (tab === 'game') resetGame();
+    if (tab === 'game') resetGame('new_case');
     setActiveTab(tab);
+  };
+
+  // Launch the daily draw from the Home screen Quick Draw card.
+  // Pre-loads case + the daily move card so pick_case is skipped entirely.
+  const handlePlayDaily = () => {
+    resetGame('daily');
+    setSelectedCase(dailyDraw.caseCard);
+    setAvailableMoves([dailyDraw.moveCard]); // one shared move card for both players
+    setActiveTab('game');
   };
 
   const handleP1Done = move => { setCurrentP1Move(move); setGamePhase('pass_to_p2'); };
@@ -132,7 +154,7 @@ export default function App() {
       players: [{ name: player1.name, points: p1pts }, { name: player2.name, points: p2pts }],
     }, ...h]);
     setActiveTab('home');
-    resetGame();
+    resetGame('new_case');
   };
 
   // ── Splash while AsyncStorage loads ─────────────────────────────────────
@@ -140,17 +162,24 @@ export default function App() {
     return (
       <SafeAreaView style={S.safe}>
         <ExpoStatusBar style="light" />
-        <View style={S.screen}>
-          {/* HomeScreen handles its own text — inline here to avoid circular import */}
-          <HomeScreen />
-        </View>
+        <HomeScreen
+          dailyDraw={dailyDraw}
+          onPlayDaily={() => {}}
+          canPlay={false}
+        />
       </SafeAreaView>
     );
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
   const renderContent = () => {
-    if (activeTab === 'home') return <HomeScreen />;
+    if (activeTab === 'home') return (
+      <HomeScreen
+        dailyDraw={dailyDraw}
+        onPlayDaily={handlePlayDaily}
+        canPlay={players.length >= 2}
+      />
+    );
     if (activeTab === 'help') return <HelpScreen />;
     if (activeTab === 'account') return (
       <AccountScreen
@@ -169,20 +198,32 @@ export default function App() {
         return (
           <PlayerPickScreen
             players={players}
-            onConfirm={(p1, p2) => { setPlayer1(p1); setPlayer2(p2); setGamePhase('pick_case'); }}
+            onConfirm={(p1, p2) => {
+              setPlayer1(p1); setPlayer2(p2);
+              // Daily mode skips case browsing — case + move are already set
+              setGamePhase(gameMode === 'daily' ? 'debate_p1' : 'pick_case');
+            }}
           />
         );
+
       case 'pick_case':
         return (
           <CardBrowser
             cards={sortedCases}
             renderCard={card => <CaseCardView card={card} />}
-            onChoose={card => { setSelectedCase(card); setGamePhase('debate_p1'); }}
+            onChoose={card => {
+              // Deal 2 move cards the moment the case is locked in.
+              // NOVICE only for the first 10 rounds of history.
+              setSelectedCase(card);
+              setAvailableMoves(dealMoveCards(history.length));
+              setGamePhase('debate_p1');
+            }}
             showRandom
             title="CHOOSE A CASE"
             subtitle={`${player1?.name}  vs  ${player2?.name}  ·  easiest first`}
           />
         );
+
       case 'debate_p1':
         return (
           <DebateScreen
@@ -190,11 +231,14 @@ export default function App() {
             caseCard={selectedCase}
             player={player1}
             nextPlayerName={player2?.name}
+            availableMoves={availableMoves}
             onDone={handleP1Done}
           />
         );
+
       case 'pass_to_p2':
         return <PassScreen name={player2?.name} onReady={() => setGamePhase('debate_p2')} />;
+
       case 'debate_p2':
         return (
           <DebateScreen
@@ -202,9 +246,11 @@ export default function App() {
             caseCard={selectedCase}
             player={player2}
             nextPlayerName={null}
+            availableMoves={availableMoves}
             onDone={handleP2Done}
           />
         );
+
       case 'round_end':
         return (
           <RoundEndScreen
@@ -216,6 +262,7 @@ export default function App() {
             onEndGame={handleEndGame}
           />
         );
+
       case 'points':
         return (
           <PointsScreen
@@ -226,8 +273,9 @@ export default function App() {
             onSave={handleSavePoints}
           />
         );
+
       default:
-        return <HomeScreen />;
+        return <HomeScreen dailyDraw={dailyDraw} onPlayDaily={handlePlayDaily} canPlay={players.length >= 2} />;
     }
   };
 

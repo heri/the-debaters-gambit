@@ -233,3 +233,47 @@ const DIFF_ORDER = { EASY: 0, MEDIUM: 1, HARD: 2 };
 export const sortedCases = [...CASE_CARDS].sort(
   (a, b) => (DIFF_ORDER[a.difficulty] ?? 1) - (DIFF_ORDER[b.difficulty] ?? 1)
 );
+
+// ── Daily Quick Draw ───────────────────────────────────────────────────────
+// Deterministic seed from today's date. The same date always produces the
+// same pick, so all players see the same daily pairing.
+// IMPORTANT: always APPEND new cards to the arrays above — inserting in the
+// middle changes index positions and breaks the daily seed for that day.
+
+function seededRand(seed) {
+  let s = (seed ^ 0x12345678) >>> 0;
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+export function getDailyDraw() {
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  let hash = 5381;
+  for (let i = 0; i < today.length; i++) {
+    hash = (((hash << 5) + hash) + today.charCodeAt(i)) | 0;
+  }
+  const rand = seededRand(hash);
+  return {
+    caseCard: CASE_CARDS[Math.floor(rand() * CASE_CARDS.length)],
+    moveCard: MOVE_CARDS[Math.floor(rand() * MOVE_CARDS.length)],
+  };
+}
+
+// ── Move card dealing (New Case flow) ─────────────────────────────────────
+// Deals 2 unique random cards. Forces NOVICE tier until the player has
+// completed 10 rounds of history (gradual difficulty ramp).
+
+export function dealMoveCards(historyLength) {
+  const pool = historyLength < 10
+    ? MOVE_CARDS.filter(c => c.tier === 'BRONZE')
+    : MOVE_CARDS;
+  const arr = [...pool];
+  // Partial Fisher-Yates: shuffle first 2 positions only
+  for (let i = 0; i < 2 && i < arr.length; i++) {
+    const j = i + Math.floor(Math.random() * (arr.length - i));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, Math.min(2, arr.length));
+}

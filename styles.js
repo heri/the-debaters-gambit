@@ -310,4 +310,41 @@ export const S = StyleSheet.create({
   navTabIconActive: { opacity: 1 },
   navTabLabel: { fontSize: 9, fontWeight: '600', color: '#667788', letterSpacing: 0.8 },
   navTabLabelActive: { color: '#E9C46A' },
+
+  // Daily Quick Draw card (Home screen)
+  dailyCard: {
+    width: CARD_W, backgroundColor: '#130926', borderRadius: 20,
+    padding: 20, marginTop: 28,
+    borderWidth: 1.5, borderColor: '#6B2FBE',
+    shadowColor: '#6B2FBE', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4, shadowRadius: 14,
+  },
+  dailyLabel: {
+    fontSize: 11, fontWeight: '700', color: '#A78BFA',
+    letterSpacing: 2.5, marginBottom: 10,
+  },
+  dailyCaseTitle: {
+    fontSize: 17, fontWeight: '900', color: '#F2EDD7',
+    lineHeight: 24, marginBottom: 12,
+  },
+  dailyDivider: {
+    height: 1, backgroundColor: '#6B2FBE', opacity: 0.4, marginBottom: 12,
+  },
+  dailyMoveLabel: {
+    fontSize: 10, fontWeight: '700', color: '#667788',
+    letterSpacing: 2, marginBottom: 4,
+  },
+  dailyMoveName: {
+    fontSize: 14, fontWeight: '800', color: '#A78BFA',
+    letterSpacing: 0.5, marginBottom: 16,
+  },
+  dailyPlayBtn: {
+    backgroundColor: '#6B2FBE', borderRadius: 28,
+    paddingHorizontal: 24, paddingVertical: 13,
+    alignItems: 'center',
+  },
+  dailyPlayBtnTxt: {
+    color: '#F2EDD7', fontWeight: '800', fontSize: 14, letterSpacing: 1.5,
+  },
+  dailyPlayBtnDisabled: { opacity: 0.4 },
 });

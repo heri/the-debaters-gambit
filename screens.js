@@ -3,18 +3,46 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { MOVE_CARDS, CARD_W, DEBATE_SECS, formatTime, timerColor } from './data';
+import { CARD_W, DEBATE_SECS, formatTime, timerColor } from './data';
 import { C, S } from './styles';
-import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner, MovePickRow } from './components';
+import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner } from './components';
 
 // ── Home ───────────────────────────────────────────────────────────────────
+// dailyDraw: { caseCard, moveCard } — pre-seeded by today's date
+// canPlay: whether >= 2 players exist (disables the daily button if not)
 
-export const HomeScreen = () => (
-  <View style={S.screen}>
+export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay }) => (
+  <ScrollView
+    contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 40 }]}
+    style={{ backgroundColor: C.bg }}
+  >
     <Text style={S.heroTitle}>THE{'\n'}DEBATER'S{'\n'}GAMBIT</Text>
     <Text style={S.heroTagline}>Words are your weapons.{'\n'}Wit is your armor.</Text>
-    <Text style={[S.hint, { marginTop: 32 }]}>Tap ⚔️ below to start a new case</Text>
-  </View>
+
+    {/* Daily Quick Draw card */}
+    <TouchableOpacity
+      style={[S.dailyCard, !canPlay && S.dailyPlayBtnDisabled]}
+      onPress={canPlay ? onPlayDaily : null}
+      activeOpacity={0.85}
+    >
+      <Text style={S.dailyLabel}>📅  TODAY'S QUICK DRAW</Text>
+      <Text style={S.dailyCaseTitle} numberOfLines={2}>
+        {dailyDraw.caseCard.title}
+      </Text>
+      <View style={S.dailyDivider} />
+      <Text style={S.dailyMoveLabel}>MOVE OF THE DAY</Text>
+      <Text style={S.dailyMoveName}>
+        {dailyDraw.moveCard.icon}  {dailyDraw.moveCard.name}
+      </Text>
+      <View style={[S.dailyPlayBtn, !canPlay && { opacity: 0.5 }]}>
+        <Text style={S.dailyPlayBtnTxt}>
+          {canPlay ? '▶  PLAY TODAY\'S ROUND' : 'ADD 2 PLAYERS TO PLAY'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+
+    <Text style={[S.hint, { marginTop: 20 }]}>Tap ⚔️ below for a custom game</Text>
+  </ScrollView>
 );
 
 // ── Help ───────────────────────────────────────────────────────────────────
@@ -76,24 +104,44 @@ export const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Debate</Text> — each player gets 5 minutes with the timer running.
-        During your turn, pick a Move Card from the list on screen if you want — it earns you a bonus point if you use it.
+        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt 2 Move Cards from the deck.
+        Beginners always receive easier NOVICE cards. You can play one for +1 bonus point, or skip entirely.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>After each round</Text> — choose to play another round or end the game and score.
+        <Text style={{ color: C.gold }}>Debate</Text> — each player gets 5 minutes with the timer running.
+        Your 2 dealt cards are shown — tap one to select it during your turn.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>4</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>After each round</Text> — choose to play another round or end the game and score.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>5</Text>
       <Text style={S.helpRuleText}>
         <Text style={{ color: C.gold }}>Score</Text> —{' '}
         <Text style={{ color: '#FC8181' }}>1 point</Text> for winning the argument.{' '}
         <Text style={{ color: '#68D391' }}>+1 bonus point</Text> if you actually used your move card.
       </Text>
     </View>
+
+    <View style={S.helpDivider} />
+    <Text style={[S.screenTitle, { marginTop: 8 }]}>QUICK DRAW</Text>
+    <Text style={S.helpBody}>
+      Every day the app generates a unique pairing — one Case and one Move Card of
+      the Day — seeded from the date. Tap{' '}
+      <Text style={{ color: C.gold }}>▶ Play Today's Round</Text> on the home
+      screen to jump straight in. No browsing, no choosing — just debate.
+    </Text>
+    <Text style={S.helpBody}>
+      Your streak will be tracked here in a future update. Start playing daily now
+      to build the habit before the counter arrives.
+    </Text>
   </ScrollView>
 );
 
@@ -290,11 +338,12 @@ export const PassScreen = ({ name, onReady }) => (
   </View>
 );
 
-// ── Debate: live timer + optional inline move picker ───────────────────────
-// Player picks (or skips) a move card during their own turn.
+// ── Debate: live timer + dealt move card picker ────────────────────────────
+// availableMoves: Card[] — 1 card (daily) or 2 cards (new case), dealt by App.
+// Player picks one or none during their own turn.
 // onDone(selectedMove | null) hands control back to the parent.
 
-export const DebateScreen = ({ caseCard, player, nextPlayerName, onDone }) => {
+export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves, onDone }) => {
   const [secondsLeft, setSecondsLeft] = useState(DEBATE_SECS);
   const [selectedMove, setSelectedMove] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -316,9 +365,12 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, onDone }) => {
   }, [showModal]);
 
   const tColor = timerColor(secondsLeft);
-
   const toggleMove = card =>
     setSelectedMove(prev => (prev?.id === card.id ? null : card));
+
+  const movePickerLabel = availableMoves.length === 1
+    ? 'YOUR MOVE CARD — OPTIONAL  (+1 BONUS PT)'
+    : 'YOUR 2 DEALT CARDS — PICK ONE OR NONE  (+1 BONUS PT)';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -338,26 +390,45 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, onDone }) => {
           </Text>
         </View>
 
-        <Text style={[S.screenLabel, { marginTop: 20 }]}>
-          PICK A MOVE CARD — OPTIONAL  (+1 BONUS PT)
-        </Text>
-
-        {MOVE_CARDS.map(card => (
-          <MovePickRow
-            key={card.id}
-            card={card}
-            selected={selectedMove?.id === card.id}
-            onPress={() => toggleMove(card)}
-          />
-        ))}
-
-        {selectedMove ? (
-          <View style={[S.movePickDesc, { borderColor: selectedMove.accent + '66', backgroundColor: selectedMove.bg }]}>
-            <Text style={[S.movePickDescTitle, { color: selectedMove.accent }]}>
-              {selectedMove.name}  ✦  {selectedMove.inspiration}
-            </Text>
-            <Text style={S.movePickDescText}>{selectedMove.description}</Text>
-          </View>
+        {availableMoves.length > 0 ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 20 }]}>{movePickerLabel}</Text>
+            {availableMoves.map(card => {
+              const selected = selectedMove?.id === card.id;
+              const dimmed = selectedMove !== null && !selected;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  onPress={() => toggleMove(card)}
+                  activeOpacity={0.88}
+                  style={[
+                    { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                    selected && {
+                      borderColor: card.accent,
+                      shadowColor: card.accent,
+                      shadowOpacity: 0.5,
+                      shadowRadius: 14,
+                      shadowOffset: { width: 0, height: 4 },
+                    },
+                    dimmed && { opacity: 0.4 },
+                  ]}
+                >
+                  <MoveCardView card={card} />
+                  {selected ? (
+                    <View style={{
+                      position: 'absolute', top: 14, right: 14,
+                      backgroundColor: card.accent, borderRadius: 14,
+                      paddingHorizontal: 12, paddingVertical: 5,
+                    }}>
+                      <Text style={{ color: '#0A0A1A', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+                        ✓ USING
+                      </Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </>
         ) : null}
 
         <Btn
