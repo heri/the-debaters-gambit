@@ -3,7 +3,8 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { CARD_W, DEBATE_SECS, formatTime, timerColor } from './data';
+import { CARD_W, DEBATE_SECS, MOVE_CARDS, formatTime, timerColor } from './data';
+import { DRILLS } from './drills';
 import { C, S } from './styles';
 import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner } from './components';
 
@@ -582,5 +583,237 @@ export const PointsScreen = ({ player1, player2, roundHistory, caseCard, onSave 
         style={{ marginTop: 8, marginBottom: 48 }}
       />
     </ScrollView>
+  );
+};
+
+// ── Solo Dojo ──────────────────────────────────────────────────────────────
+// completedDrills: string[] — card IDs the player has fully drilled at least once
+// onComplete(cardId)        — called when both steps of a drill are finished
+
+export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
+  const [view, setView]               = useState('select'); // 'select' | 'drill'
+  const [currentCard, setCurrentCard] = useState(null);
+  const [step, setStep]               = useState(0);          // 0 or 1
+  const [phase, setPhase]             = useState('question'); // 'question' | 'feedback' | 'complete'
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [wasCorrect, setWasCorrect]   = useState(false);
+
+  const bronzeCards = MOVE_CARDS.filter(c => c.tier === 'BRONZE');
+  const silverCards = MOVE_CARDS.filter(c => c.tier === 'SILVER');
+  const goldCards   = MOVE_CARDS.filter(c => c.tier === 'GOLD');
+
+  const allBronzeDone = bronzeCards.every(c => completedDrills.includes(c.id));
+  const allSilverDone = silverCards.every(c => completedDrills.includes(c.id));
+
+  const isUnlocked = card => {
+    if (card.tier === 'BRONZE') return true;
+    if (card.tier === 'SILVER') return allBronzeDone;
+    return allBronzeDone && allSilverDone;
+  };
+
+  const startDrill = card => {
+    setCurrentCard(card);
+    setStep(0);
+    setPhase('question');
+    setSelectedOption(null);
+    setWasCorrect(false);
+    setView('drill');
+  };
+
+  const handleOption = idx => {
+    if (phase !== 'question') return;
+    const correct = DRILLS[currentCard.id].steps[step].correct === idx;
+    setSelectedOption(idx);
+    setWasCorrect(correct);
+    setPhase('feedback');
+  };
+
+  const handleNext = () => {
+    if (step === 0) {
+      setStep(1);
+      setPhase('question');
+      setSelectedOption(null);
+      setWasCorrect(false);
+    } else {
+      onComplete(currentCard.id);
+      setPhase('complete');
+    }
+  };
+
+  const handleBack = () => {
+    setView('select');
+    setCurrentCard(null);
+  };
+
+  // ── Selection view ─────────────────────────────────────────────────────────
+
+  if (view === 'select') {
+    const renderTier = (label, cards) => (
+      <>
+        <View style={S.dojoTierHeader}>
+          <View style={S.dojoTierLine} />
+          <Text style={S.dojoTierLabel}>{label}</Text>
+          <View style={S.dojoTierLine} />
+        </View>
+        {cards.map(card => {
+          const unlocked = isUnlocked(card);
+          const done = completedDrills.includes(card.id);
+          return (
+            <TouchableOpacity
+              key={card.id}
+              style={[S.dojoRow, done && S.dojoRowDone, !unlocked && S.dojoRowLocked]}
+              onPress={() => unlocked && startDrill(card)}
+              activeOpacity={unlocked ? 0.8 : 1}
+            >
+              <Text style={S.dojoRowIcon}>{card.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={S.dojoRowName}>{card.name}</Text>
+                <Text style={S.dojoRowInspo}>{card.inspiration}</Text>
+              </View>
+              <Text style={S.dojoRowStatus}>{!unlocked ? '🔒' : done ? '✅' : '▶'}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </>
+    );
+
+    return (
+      <ScrollView
+        contentContainerStyle={[S.scrollContent, { paddingTop: 70, paddingBottom: 48 }]}
+        style={{ backgroundColor: C.bg }}
+      >
+        <Text style={S.screenLabel}>TRAINING WITH ARGUS</Text>
+        <Text style={S.screenTitle}>🦊 SOLO DOJO</Text>
+        <Text style={[S.hint, { marginBottom: 4 }]}>
+          Pick a move card to drill alone.{'\n'}Argus will challenge you!
+        </Text>
+
+        {renderTier('BRONZE · NOVICE', bronzeCards)}
+        {renderTier('SILVER · TACTICIAN & STORYTELLER', silverCards)}
+        {renderTier('GOLD · ORATOR & MASTER', goldCards)}
+
+        {!allBronzeDone ? (
+          <Text style={[S.hint, { marginTop: 20 }]}>
+            Complete all BRONZE drills to unlock SILVER
+          </Text>
+        ) : !allSilverDone ? (
+          <Text style={[S.hint, { marginTop: 20 }]}>
+            Complete all SILVER drills to unlock GOLD
+          </Text>
+        ) : (
+          <Text style={[S.hint, { marginTop: 20, color: C.gold }]}>
+            🏆 All tiers unlocked — master level!
+          </Text>
+        )}
+      </ScrollView>
+    );
+  }
+
+  // ── Drill view ─────────────────────────────────────────────────────────────
+
+  const drill = DRILLS[currentCard?.id];
+  if (!drill) return null;
+  const currentStep = drill.steps[step];
+
+  if (phase === 'complete') {
+    return (
+      <View style={S.screen}>
+        <Text style={{ fontSize: 72, marginBottom: 16 }}>⭐</Text>
+        <Text style={S.screenTitle}>{currentCard.name}</Text>
+        <Text style={[S.heroTagline, { marginTop: 8 }]}>
+          Drill complete!{'\n'}Argus is impressed.
+        </Text>
+        <Btn label="← BACK TO DOJO" onPress={handleBack} style={{ marginTop: 32 }} />
+      </View>
+    );
+  }
+
+  const letters = ['A', 'B', 'C'];
+
+  const optionStyle = idx => {
+    if (phase === 'question') return S.drillOption;
+    if (idx === currentStep.correct) return [S.drillOption, S.drillOptionCorrect];
+    if (idx === selectedOption && !wasCorrect) return [S.drillOption, S.drillOptionWrong];
+    return [S.drillOption, { opacity: 0.4 }];
+  };
+
+  const letterStyle = idx => {
+    if (phase === 'question') return [S.drillOptionLetter];
+    if (idx === currentStep.correct) return [S.drillOptionLetter, { backgroundColor: '#15803D' }];
+    if (idx === selectedOption && !wasCorrect) return [S.drillOptionLetter, { backgroundColor: '#9B1C1C' }];
+    return [S.drillOptionLetter];
+  };
+
+  const letterTxtStyle = idx => {
+    if (phase !== 'question' && (idx === currentStep.correct || (idx === selectedOption && !wasCorrect))) {
+      return [S.drillOptionLetterTxt, { color: '#F2EDD7' }];
+    }
+    return S.drillOptionLetterTxt;
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 40 }]}>
+        <TouchableOpacity
+          onPress={handleBack}
+          style={{ alignSelf: 'flex-start', marginBottom: 16, padding: 4 }}
+        >
+          <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700', letterSpacing: 1 }}>
+            ← DOJO
+          </Text>
+        </TouchableOpacity>
+
+        <View style={S.drillStepPip}>
+          <View style={[S.drillPip, step === 0 && S.drillPipActive]} />
+          <View style={[S.drillPip, step === 1 && S.drillPipActive]} />
+          <Text style={[S.hint, { marginLeft: 8, marginBottom: 0, fontStyle: 'normal' }]}>
+            Step {step + 1} of 2
+          </Text>
+        </View>
+
+        <Text style={[S.screenLabel, { marginBottom: 12 }]}>
+          {currentCard.icon}  {currentCard.name}
+        </Text>
+
+        <View style={S.argusBubble}>
+          <View style={S.argusBubbleHeader}>
+            <Text style={S.argusMascot}>🦊</Text>
+            <Text style={S.argusName}>ARGUS</Text>
+          </View>
+          <Text style={S.argusSpeech}>{currentStep.argus}</Text>
+        </View>
+
+        <Text style={S.drillQuestion}>{currentStep.question}</Text>
+
+        {currentStep.options.map((opt, idx) => (
+          <TouchableOpacity
+            key={idx}
+            style={optionStyle(idx)}
+            onPress={() => handleOption(idx)}
+            activeOpacity={phase === 'question' ? 0.8 : 1}
+          >
+            <View style={letterStyle(idx)}>
+              <Text style={letterTxtStyle(idx)}>{letters[idx]}</Text>
+            </View>
+            <Text style={S.drillOptionTxt}>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+
+        {phase === 'feedback' ? (
+          <>
+            <View style={[S.drillFeedback, wasCorrect ? S.drillFeedbackOk : S.drillFeedbackOops]}>
+              <Text style={S.drillFeedbackTxt}>
+                {wasCorrect ? currentStep.feedbackOk : currentStep.feedbackOops}
+              </Text>
+            </View>
+            <Btn
+              label={step === 0 ? 'NEXT STEP  →' : '⭐  COMPLETE DRILL'}
+              onPress={handleNext}
+              style={{ marginTop: 12 }}
+            />
+          </>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 };

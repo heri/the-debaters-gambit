@@ -18,6 +18,7 @@ export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const NAV_TABS = [
   { id: 'home',    icon: '🏠', label: 'Home' },
   { id: 'game',    icon: '⚔️', label: 'New Case' },
+  { id: 'dojo',    icon: '🦊', label: 'Dojo' },
   { id: 'account', icon: '👤', label: 'Account' },
   { id: 'help',    icon: '❓', label: 'Help' },
 ];

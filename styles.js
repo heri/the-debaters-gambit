@@ -311,6 +311,87 @@ export const S = StyleSheet.create({
   navTabLabel: { fontSize: 9, fontWeight: '600', color: '#667788', letterSpacing: 0.8 },
   navTabLabelActive: { color: '#E9C46A' },
 
+  // Solo Dojo — card selection list
+  dojoTierHeader: {
+    width: CARD_W, flexDirection: 'row', alignItems: 'center', marginTop: 18, marginBottom: 6,
+  },
+  dojoTierLine: { flex: 1, height: 1, backgroundColor: '#1E2235' },
+  dojoTierLabel: {
+    fontSize: 10, fontWeight: '700', color: '#667788',
+    letterSpacing: 2.5, marginHorizontal: 10,
+  },
+  dojoRow: {
+    flexDirection: 'row', alignItems: 'center', width: CARD_W,
+    backgroundColor: '#111124', borderRadius: 14, padding: 14,
+    marginVertical: 4, borderWidth: 1, borderColor: '#1E2235',
+  },
+  dojoRowDone: { borderColor: '#4ADE80', backgroundColor: '#0A1A10' },
+  dojoRowLocked: { opacity: 0.35 },
+  dojoRowIcon: { fontSize: 26, marginRight: 12, minWidth: 40, textAlign: 'center' },
+  dojoRowName: { flex: 1, fontSize: 14, fontWeight: '800', color: '#F2EDD7', letterSpacing: 0.5 },
+  dojoRowInspo: { fontSize: 11, color: '#667788', marginTop: 2 },
+  dojoRowStatus: { fontSize: 18, marginLeft: 8 },
+
+  // Solo Dojo — Argus speech bubble
+  argusBubble: {
+    width: CARD_W, backgroundColor: '#1A1200', borderRadius: 16,
+    padding: 18, marginBottom: 4,
+    borderWidth: 1.5, borderColor: '#E9C46A',
+    shadowColor: '#E9C46A', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 10,
+  },
+  argusBubbleHeader: {
+    flexDirection: 'row', alignItems: 'center', marginBottom: 10,
+  },
+  argusMascot: { fontSize: 28, marginRight: 10 },
+  argusName: { fontSize: 11, fontWeight: '700', color: '#E9C46A', letterSpacing: 2 },
+  argusSpeech: { fontSize: 15, color: '#F2EDD7', lineHeight: 24, fontStyle: 'italic' },
+
+  // Solo Dojo — drill question & step
+  drillStepPip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12,
+  },
+  drillPip: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: '#1E2235',
+  },
+  drillPipActive: { backgroundColor: '#E9C46A', width: 20, borderRadius: 4 },
+  drillQuestion: {
+    fontSize: 16, fontWeight: '700', color: '#F2EDD7',
+    lineHeight: 26, textAlign: 'center', marginBottom: 16,
+  },
+
+  // Solo Dojo — multiple choice options
+  drillOption: {
+    width: CARD_W, backgroundColor: '#111124', borderRadius: 12,
+    paddingHorizontal: 18, paddingVertical: 14,
+    marginVertical: 4, borderWidth: 1.5, borderColor: '#1E2235',
+    flexDirection: 'row', alignItems: 'center',
+  },
+  drillOptionLetter: {
+    width: 26, height: 26, borderRadius: 8, backgroundColor: '#1E2235',
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+  },
+  drillOptionLetterTxt: { fontSize: 12, fontWeight: '800', color: '#667788' },
+  drillOptionTxt: { flex: 1, fontSize: 14, color: '#F2EDD7', lineHeight: 20 },
+  drillOptionCorrect: {
+    borderColor: '#4ADE80', backgroundColor: '#0A1A10',
+  },
+  drillOptionWrong: {
+    borderColor: '#FC8181', backgroundColor: '#1A0A0A',
+  },
+  drillOptionReveal: {
+    borderColor: '#4ADE80', backgroundColor: '#0A1A10', opacity: 0.7,
+  },
+
+  // Solo Dojo — feedback strip
+  drillFeedback: {
+    width: CARD_W, borderRadius: 12, padding: 16,
+    marginTop: 8, marginBottom: 4,
+  },
+  drillFeedbackOk: { backgroundColor: '#0A1A10', borderWidth: 1, borderColor: '#4ADE80' },
+  drillFeedbackOops: { backgroundColor: '#1A0A0A', borderWidth: 1, borderColor: '#FC8181' },
+  drillFeedbackTxt: { fontSize: 14, lineHeight: 22, color: '#F2EDD7', textAlign: 'center' },
+
   // Daily Quick Draw card (Home screen)
   dailyCard: {
     width: CARD_W, backgroundColor: '#130926', borderRadius: 20,

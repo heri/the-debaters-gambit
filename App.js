@@ -14,7 +14,7 @@ import { CardBrowser, CaseCardView, BottomNav } from './components';
 import {
   HomeScreen, HelpScreen, AccountScreen,
   PlayerPickScreen, PassScreen, DebateScreen,
-  RoundEndScreen, PointsScreen,
+  RoundEndScreen, PointsScreen, SoloDojoScreen,
 } from './screens';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -56,14 +56,18 @@ export default function App() {
   // In-memory across games
   const [history, setHistory] = useState([]);
 
+  // Solo Dojo — persisted list of completed card IDs
+  const [completedDrills, setCompletedDrills] = useState([]);
+
   // Daily draw is stable for the session (date doesn't change mid-game)
   const dailyDraw = useMemo(() => getDailyDraw(), []);
 
   // ── Load from AsyncStorage on mount ─────────────────────────────────────
   useEffect(() => {
-    AsyncStorage.multiGet(['players', 'settings']).then(results => {
-      const playersRaw = results[0][1];
-      const settingsRaw = results[1][1];
+    AsyncStorage.multiGet(['players', 'settings', 'completedDrills']).then(results => {
+      const playersRaw        = results[0][1];
+      const settingsRaw       = results[1][1];
+      const completedDrillsRaw = results[2][1];
 
       if (playersRaw) {
         const saved = JSON.parse(playersRaw);
@@ -78,6 +82,8 @@ export default function App() {
         const s = JSON.parse(settingsRaw);
         if (s.defaultRounds) setDefaultRounds(s.defaultRounds);
       }
+
+      if (completedDrillsRaw) setCompletedDrills(JSON.parse(completedDrillsRaw));
 
       setIsReady(true);
     }).catch(() => setIsReady(true));
@@ -94,6 +100,11 @@ export default function App() {
     AsyncStorage.setItem('settings', JSON.stringify({ defaultRounds })).catch(() => {});
   }, [defaultRounds, isReady]);
 
+  useEffect(() => {
+    if (!isReady) return;
+    AsyncStorage.setItem('completedDrills', JSON.stringify(completedDrills)).catch(() => {});
+  }, [completedDrills, isReady]);
+
   // ── Player management ────────────────────────────────────────────────────
   const handleAddPlayer = name => {
     const updated = [...players, { id: uid(), name }];
@@ -105,6 +116,13 @@ export default function App() {
   };
 
   const handleRemovePlayer = id => setPlayers(prev => prev.filter(p => p.id !== id));
+
+  // ── Solo Dojo ────────────────────────────────────────────────────────────
+  const handleDrillComplete = cardId => {
+    if (!completedDrills.includes(cardId)) {
+      setCompletedDrills(prev => [...prev, cardId]);
+    }
+  };
 
   // ── Game management ──────────────────────────────────────────────────────
   const resetGame = (mode = 'new_case') => {
@@ -181,6 +199,12 @@ export default function App() {
       />
     );
     if (activeTab === 'help') return <HelpScreen />;
+    if (activeTab === 'dojo') return (
+      <SoloDojoScreen
+        completedDrills={completedDrills}
+        onComplete={handleDrillComplete}
+      />
+    );
     if (activeTab === 'account') return (
       <AccountScreen
         players={players}
