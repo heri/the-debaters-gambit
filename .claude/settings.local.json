@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(nvm ls *)",
-      "Bash(nvm ls-remote *)"
+      "Bash(nvm ls-remote *)",
+      "Bash(npm install *)",
+      "Bash(npx jest *)",
+      "Bash(./node_modules/.bin/jest --watchAll=false)",
+      "Bash(node_modules/.bin/jest --watchAll=false)"
     ]
   }
 }
