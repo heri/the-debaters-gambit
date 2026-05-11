@@ -14,6 +14,8 @@ A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superhero
 
 Each player gets 5 minutes to speak. Then points are awarded — 1 for winning the argument, and a bonus point if you actually used a move card. Over time, the card pool expands from Bronze to Gold tier as you build real-world persuasion and storytelling skills.
 
+The app treats players as **junior debaters, not students** — members of the *Parlour of Minds*. Not here to learn. Here to practise.
+
 ---
 
 ## Scoring
@@ -38,6 +40,14 @@ Full custom game. Browse and pick any case, get dealt 2 random move cards, play 
 **Move card dealing rules:**
 - Fewer than 10 rounds in history → always dealt **NOVICE (Bronze)** cards — easier techniques suited to beginners
 - 10+ rounds → dealt from the full card pool (Bronze, Silver, Gold)
+
+### 🦊 Solo Dojo (bottom nav)
+Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill move cards alone through a 2-step interactive challenge per card:
+
+1. **Spot the flaw** — Argus presents a bad argument; player picks the correct critique (multiple choice)
+2. **Build the counter** — player completes a counter-argument using the move technique (fill in the blank)
+
+**Tier gating:** BRONZE drills are available immediately. SILVER unlocks when all 8 BRONZE are completed. GOLD unlocks when both SILVER are completed. All drills are replayable.
 
 ---
 
@@ -99,15 +109,60 @@ First launch → Account tab (add 2 players) → game launches automatically
 ⚔️  New Case tab →
   1. Choose 2 players
   2. Browse case cards (sorted Easy → Hard, swipe or arrow)
-     — or tap 🎲 Random for a slot-machine pick
+     — or tap 🎲 Random for a slot-machine pick ("🦊 Argus chooses...")
   3. 2 move cards are dealt to both players (NOVICE only before 10 rounds in history)
   4. DEBATE — 5-minute live timer per player
      - Full case description visible at all times
-     - Your 2 dealt cards shown; pick one (or none) during your turn
+     - Your 2 dealt cards shown full-size; tap one to select it during your turn
      - Tap "Done" to finish early and pass to opponent
   5. After each round: "Next Round" or "End Game & Score"
   6. SCORE — reveal chosen move cards, award points, save to history
+
+🦊  Solo Dojo tab →
+  1. Pick any unlocked move card from the list
+  2. Step 1 — Argus presents a bad argument; spot the flaw (A / B / C)
+  3. Step 2 — Complete the counter-argument using the move
+  4. Drill marked complete; replay anytime
 ```
+
+---
+
+## Design Direction: Ink & Spark
+
+The visual identity is **a debating club that a 9-year-old broke into and redecorated.** Classic bones. Chaotic energy inside.
+
+### Colour palette
+
+| Token | Hex | Role |
+|---|---|---|
+| Ink Navy | `#0D0F1C` | Background |
+| Debate Gold | `#F5C842` | Primary accent, CTAs, highlights |
+| Parchment | `#E8DFC8` | Card text, secondary text |
+| Electric Teal | `#2ECFB0` | Daily draw, live indicators, player chips |
+| Argument Red | `#C0392B` | Timer danger state |
+| Bronze | `#8B6914` | Tier 1 card indicator |
+
+### Mascot: Argus
+
+Argus is a fox barrister — tiny curly wig (slightly tilted), teal waistcoat, gold pocket watch chain. He appears in the Solo Dojo as a sparring partner who **respects the player as a worthy opponent**, not a student.
+
+Expression range: Confident · Suspicious · Dramatic · Smug · Encouraging · Thinking.
+
+App icon: Argus's face inside a shield crest on Ink Navy, with gold laurel detail.
+
+### Tone of voice
+
+The game speaks like a sparring partner, not a teacher.
+
+| Situation | App says |
+|---|---|
+| After a debate round | "Both sides have spoken. The Parlour awaits your verdict." |
+| P1 done, passing to P2 | "Your argument is on record. The floor passes to [P2]." |
+| Winner declared | "Verdict: [Name]." |
+| Tied game | "The Parlour calls a draw." |
+| Drill complete | "Verdict: mastered. The Parlour notes your progress." |
+| All tiers unlocked | "Argus calls you a worthy debater." |
+| Random button spinning | "🦊 Argus chooses..." |
 
 ---
 
@@ -119,7 +174,7 @@ First launch → Account tab (add 2 players) → game launches automatically
 | Language | **JavaScript / React 19** | Fast iteration; no compile step |
 | Navigation | **Custom state machine** (`gamePhase` + `gameMode`) | No dependency overhead for a linear flow |
 | Animation | **React Native `Animated` API** | Built-in; powers card slide transitions and random spin |
-| Persistence | **AsyncStorage** | Player names and settings survive app restarts |
+| Persistence | **AsyncStorage** | Players, settings, and completed drills survive app restarts |
 | Styling | **StyleSheet** | Native performance; no third-party UI lib |
 | Safe area | **react-native-safe-area-context** | Correct notch/Dynamic Island handling on iOS |
 | Build/Deploy | **EAS Build + TestFlight** | Cloud iOS builds without a Mac CI server |
@@ -127,17 +182,22 @@ First launch → Account tab (add 2 players) → game launches automatically
 ### File structure
 
 ```
-App.js          ← state machine + AsyncStorage only
-data.js         ← MOVE_CARDS, CASE_CARDS, getDailyDraw(), dealMoveCards()
-styles.js       ← design tokens (C) + StyleSheet (S)
+App.js          ← state machine + AsyncStorage (players, settings, completedDrills)
+data.js         ← MOVE_CARDS, CASE_CARDS, NAV_TABS, getDailyDraw(), dealMoveCards()
+drills.js       ← 2-step drill content for all 12 move cards (Argus Solo Dojo)
+styles.js       ← design tokens (C) + StyleSheet (S) — Ink & Spark palette
 components.js   ← Btn, CardBrowser, MovePickRow, BottomNav, card views
-screens.js      ← all 8 screens
-package.json
-app.json        ← Expo + EAS config
-babel.config.js
+screens.js      ← all 9 screens (Home, Help, Account, PlayerPick, Pass, Debate,
+                   RoundEnd, Points, SoloDojo)
+app.json        ← Expo + EAS config; icon = argus_main_icon.png
+argus_main_icon.png              ← shield crest icon (app icon + dojo bubble)
+argus_expressions.png            ← 6-expression sprite (Confident/Suspicious/etc.)
+argus_expressions_shields_laurel.png ← shield-framed expressions (Dojo header)
 ```
 
-**To add a card:** edit `data.js` only. Always **append** to the arrays — inserting changes index positions and breaks the daily seed for that date.
+**To add a move card:** edit `data.js` (append to `MOVE_CARDS`) + add a matching entry to `drills.js`. Always **append** — inserting changes index positions and breaks the daily seed for that date.
+
+**To add a case card:** edit `data.js` only (append to `CASE_CARDS`).
 
 ---
 
@@ -165,6 +225,6 @@ eas submit --platform ios
 
 ## Roadmap
 
-- **V1 (current)** — local pass-and-play, daily quick draw, dealt move cards, multi-round, scoring, player roster, history, AsyncStorage persistence
+- **V1 (current)** — local pass-and-play, daily quick draw, dealt move cards, multi-round, scoring, player roster, history, Solo Dojo with Argus, AsyncStorage persistence, Ink & Spark design direction
 - **V2** — daily streak counter, audio recording + transcription (Apple Speech framework), LLM judge (Gemini Flash), structured verdict (winner + witty breakdown + feedback)
 - **V3** — player accounts, match history, remote multiplayer, card deck OTA updates via Firebase/Supabase

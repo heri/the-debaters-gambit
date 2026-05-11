@@ -4,6 +4,12 @@
     "slug": "the-debaters-gambit",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./argus_main_icon.png",
+    "splash": {
+      "image": "./argus_main_icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D0F1C"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.studiozenkai.debatersgambit",
@@ -12,7 +18,11 @@
       }
     },
     "android": {
-      "package": "com.studiozenkai.debatersgambit"
+      "package": "com.studiozenkai.debatersgambit",
+      "adaptiveIcon": {
+        "foregroundImage": "./argus_main_icon.png",
+        "backgroundColor": "#0D0F1C"
+      }
     },
     "extra": {
       "eas": {

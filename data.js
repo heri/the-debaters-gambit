@@ -11,7 +11,7 @@ export const DEBATE_SECS = 5 * 60;
 export const formatTime = s =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-export const timerColor = s => (s > 120 ? '#68D391' : s > 60 ? '#ECC94B' : '#FC8181');
+export const timerColor = s => (s > 120 ? '#2ECFB0' : s > 60 ? '#F5C842' : '#C0392B');
 
 export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 

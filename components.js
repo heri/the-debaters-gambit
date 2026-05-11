@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, Animated, Dimensions,
+  View, Text, TouchableOpacity, ScrollView, Animated, Dimensions, Image,
 } from 'react-native';
 import { CARD_W, NAV_TABS } from './data';
 import { C, S } from './styles';
@@ -67,7 +67,7 @@ export const CaseCardView = ({ card }) => (
     {card.focus ? <Text style={S.caseFocus}>{card.focus}</Text> : null}
     <Text style={S.caseArt}>{card.icon}</Text>
     <Text style={S.caseTitle}>{card.title}</Text>
-    <View style={[S.divider, { backgroundColor: '#7B2FBE' }]} />
+    <View style={[S.divider, { backgroundColor: '#F5C842' }]} />
     <Text style={S.caseDesc}>{card.description}</Text>
   </View>
 );
@@ -203,7 +203,7 @@ export const CardBrowser = ({ cards, renderCard, onChoose, showRandom, title, su
         <Btn label="✓  CHOOSE THIS" onPress={() => onChoose(cards[idx])} disabled={isSpinning} />
         {showRandom ? (
           <Btn
-            label={isSpinning ? '🎲  SHUFFLING...' : '🎲  RANDOM'}
+            label={isSpinning ? '🦊  ARGUS CHOOSES...' : '🎲  RANDOM'}
             variant="secondary"
             onPress={handleRandom}
             disabled={isSpinning}

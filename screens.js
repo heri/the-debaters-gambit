@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { CARD_W, DEBATE_SECS, MOVE_CARDS, formatTime, timerColor } from './data';
 import { DRILLS } from './drills';
@@ -42,7 +42,7 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay }) => (
       </View>
     </TouchableOpacity>
 
-    <Text style={[S.hint, { marginTop: 20 }]}>Tap ⚔️ below for a custom game</Text>
+    <Text style={[S.hint, { marginTop: 20 }]}>Step into the Parlour — tap ⚔️ to choose your case</Text>
   </ScrollView>
 );
 
@@ -91,6 +91,11 @@ export const HelpScreen = () => (
       over the horizon — returning with stories so extraordinary that the whole
       kingdom went quiet to hear them. A life of adventure written entirely in
       arguments won.
+    </Text>
+    <Text style={S.helpBody}>
+      The game treats you as a junior debater — not a student. A member of the{' '}
+      <Text style={{ color: C.gold, fontStyle: 'italic' }}>Parlour of Minds</Text>.
+      Not here to learn. Here to practise.
     </Text>
 
     <View style={S.helpDivider} />
@@ -301,7 +306,7 @@ export const PlayerPickScreen = ({ players, onConfirm }) => {
             onPress={() => toggle(p)}
             activeOpacity={0.8}
           >
-            <View style={[S.pickBadge, picked && { backgroundColor: C.purple }]}>
+            <View style={[S.pickBadge, picked && { backgroundColor: C.teal }]}>
               <Text style={S.pickBadgeTxt}>{picked ? `P${num}` : '  '}</Text>
             </View>
             <Text style={[S.pickName, picked && { color: C.text }]}>{p.name}</Text>
@@ -377,8 +382,8 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves,
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={[S.timerBanner, { borderColor: tColor + '55', backgroundColor: tColor + '14' }]}>
         <Text style={[S.timerTxt, { color: tColor }]}>{formatTime(secondsLeft)}</Text>
-        <View style={[S.playerChip, { backgroundColor: C.purple }]}>
-          <Text style={S.playerChipTxt}>{player.name.toUpperCase()}</Text>
+        <View style={[S.playerChip, { backgroundColor: C.teal }]}>
+          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}</Text>
         </View>
       </View>
 
@@ -421,7 +426,7 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves,
                       backgroundColor: card.accent, borderRadius: 14,
                       paddingHorizontal: 12, paddingVertical: 5,
                     }}>
-                      <Text style={{ color: '#0A0A1A', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
                         ✓ USING
                       </Text>
                     </View>
@@ -447,8 +452,8 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves,
             </Text>
             <Text style={S.modalBody}>
               {nextPlayerName
-                ? `Great job, ${player.name}!\nPass the phone to ${nextPlayerName}.`
-                : `${player.name} has spoken!\nTime to decide what's next.`}
+                ? `Your argument is on record.\nThe floor passes to ${nextPlayerName}.`
+                : `${player.name} has spoken.\nThe Parlour awaits your verdict.`}
             </Text>
             <Btn
               label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
@@ -466,9 +471,9 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves,
 export const RoundEndScreen = ({ currentRound, defaultRounds, player1, player2, onNextRound, onEndGame }) => (
   <View style={S.screen}>
     <Text style={[S.screenLabel, { marginBottom: 8 }]}>ROUND {currentRound} COMPLETE</Text>
-    <Text style={S.heroTitle}>WELL{'\n'}FOUGHT!</Text>
+    <Text style={S.heroTitle}>WELL{'\n'}ARGUED.</Text>
     <Text style={[S.hint, { marginTop: 16 }]}>
-      {player1.name} and {player2.name} have both spoken.{'\n'}What's next?
+      Both sides have spoken.{'\n'}The Parlour awaits your verdict.
     </Text>
     <Btn label={`⚔️  PLAY ROUND ${currentRound + 1}`} onPress={onNextRound} style={{ marginTop: 40 }} />
     <Btn label="🏆  END GAME & SCORE" variant="secondary" onPress={onEndGame} />
@@ -558,7 +563,7 @@ export const PointsScreen = ({ player1, player2, roundHistory, caseCard, onSave 
         </View>
       ))}
 
-      <View style={[S.pointsSection, { backgroundColor: '#1A1500', borderColor: '#E9C46A44', marginBottom: 8 }]}>
+      <View style={[S.pointsSection, { backgroundColor: '#1A1500', borderColor: '#F5C84244', marginBottom: 8 }]}>
         <Text style={[S.screenLabel, { marginBottom: 12 }]}>GRAND TOTAL</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
           <View style={{ alignItems: 'center' }}>
@@ -571,9 +576,9 @@ export const PointsScreen = ({ player1, player2, roundHistory, caseCard, onSave 
           </View>
         </View>
         {winner ? (
-          <Text style={[S.screenTitle, { marginTop: 16, color: C.text }]}>🏆  {winner} WINS!</Text>
+          <Text style={[S.screenTitle, { marginTop: 16, color: C.text }]}>🏆  VERDICT: {winner}.</Text>
         ) : (p1Total > 0 || p2Total > 0) ? (
-          <Text style={[S.screenTitle, { marginTop: 16, color: C.muted }]}>IT'S A TIE!</Text>
+          <Text style={[S.screenTitle, { marginTop: 16, color: C.muted }]}>THE PARLOUR CALLS A DRAW.</Text>
         ) : null}
       </View>
 
@@ -683,10 +688,14 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
         style={{ backgroundColor: C.bg }}
       >
         <Text style={S.screenLabel}>TRAINING WITH ARGUS</Text>
-        <Text style={S.screenTitle}>🦊 SOLO DOJO</Text>
+        <Text style={S.screenTitle}>SOLO DOJO</Text>
         <Text style={[S.hint, { marginBottom: 4 }]}>
           Pick a move card to drill alone.{'\n'}Argus will challenge you!
         </Text>
+        <Image
+          source={require('./argus_expressions_shields_laurel.png')}
+          style={{ width: CARD_W, height: CARD_W * 0.66, resizeMode: 'contain', marginBottom: 8, opacity: 0.92 }}
+        />
 
         {renderTier('BRONZE · NOVICE', bronzeCards)}
         {renderTier('SILVER · TACTICIAN & STORYTELLER', silverCards)}
@@ -702,7 +711,7 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
           </Text>
         ) : (
           <Text style={[S.hint, { marginTop: 20, color: C.gold }]}>
-            🏆 All tiers unlocked — master level!
+            All tiers mastered. Argus calls you a worthy debater.
           </Text>
         )}
       </ScrollView>
@@ -721,7 +730,7 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
         <Text style={{ fontSize: 72, marginBottom: 16 }}>⭐</Text>
         <Text style={S.screenTitle}>{currentCard.name}</Text>
         <Text style={[S.heroTagline, { marginTop: 8 }]}>
-          Drill complete!{'\n'}Argus is impressed.
+          Verdict: mastered.{'\n'}The Parlour notes your progress.
         </Text>
         <Btn label="← BACK TO DOJO" onPress={handleBack} style={{ marginTop: 32 }} />
       </View>
@@ -746,7 +755,7 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
 
   const letterTxtStyle = idx => {
     if (phase !== 'question' && (idx === currentStep.correct || (idx === selectedOption && !wasCorrect))) {
-      return [S.drillOptionLetterTxt, { color: '#F2EDD7' }];
+      return [S.drillOptionLetterTxt, { color: '#E8DFC8' }];
     }
     return S.drillOptionLetterTxt;
   };
@@ -777,7 +786,10 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
 
         <View style={S.argusBubble}>
           <View style={S.argusBubbleHeader}>
-            <Text style={S.argusMascot}>🦊</Text>
+            <Image
+              source={require('./argus_main_icon.png')}
+              style={{ width: 44, height: 44, borderRadius: 10, marginRight: 10 }}
+            />
             <Text style={S.argusName}>ARGUS</Text>
           </View>
           <Text style={S.argusSpeech}>{currentStep.argus}</Text>
