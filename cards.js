@@ -1,0 +1,231 @@
+// Move Cards and Case Cards data.
+// Each move card has:
+//   what   — 1 sentence: what the move IS
+//   hint   — 1 sentence: a concrete structural cue ("the move in action")
+//   status — 'active' | 'draft' | 'archived'
+//
+// Always APPEND to these arrays — never insert in the middle.
+// Inserting changes index positions and breaks the daily seed for that date.
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MOVE CARDS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const MOVE_CARDS = [
+  // ── BRONZE tier ───────────────────────────────────────────────────────────
+  {
+    id: 'm-b1', name: 'THE FAIR PLAY', icon: '🚩⚖️',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A0000', accent: '#F87171',
+    what: 'Appeal to fairness and the rules to make your point feel like the obvious right thing to do.',
+    hint: "Say 'We all agreed that…' or 'The rule is clear:' — then state your point with total certainty.",
+    inspiration: 'Hermione Granger',
+    status: 'active',
+  },
+  {
+    id: 'm-b2', name: 'THE KIND HEART', icon: '🧥💗',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A0A12', accent: '#F9A8D4',
+    what: "Show you understand your opponent's feelings first, then steer gently toward the kinder choice.",
+    hint: "Open with 'I understand why you feel that way…' then slowly pivot to your point.",
+    inspiration: 'Mister Rogers',
+    status: 'active',
+  },
+  {
+    id: 'm-b3', name: 'THE GOLDEN RULE', icon: '🪙🤝',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#0A1A15', accent: '#6EE7B7',
+    what: 'Find the bigger goal underneath the whole debate and show your answer serves everyone.',
+    hint: "Ask yourself 'What's this REALLY about?' — then argue for that deeper purpose.",
+    inspiration: 'Moana',
+    status: 'active',
+  },
+  {
+    id: 'm-b4', name: 'THE PINKY PROMISE', icon: '🤞✨',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A1200', accent: '#FCD34D',
+    what: 'Make such a sincere, specific commitment that your certainty itself becomes the argument.',
+    hint: 'State exactly what will happen if your side wins — in specific detail, with zero hesitation.',
+    inspiration: 'Pinocchio (reformed)',
+    status: 'active',
+  },
+  {
+    id: 'm-b5', name: 'THE TEAM', icon: '🐾⭐',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#000D1A', accent: '#93C5FD',
+    what: 'Show how your position benefits everybody — the whole group, not just yourself.',
+    hint: "List who wins: 'This helps [A], [B], and even [C] — nobody loses.'",
+    inspiration: 'Paw Patrol',
+    status: 'active',
+  },
+  {
+    id: 'm-b6', name: 'THE BEST FRIEND', icon: '🤠👢',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A0A00', accent: '#FDBA74',
+    what: 'Calmly and stubbornly stick to your position no matter how much pressure is applied.',
+    hint: "When pushed hard, simply restate: 'I hear you — and I still believe…'",
+    inspiration: 'Woody',
+    status: 'active',
+  },
+  {
+    id: 'm-b7', name: "THE LION'S COURAGE", icon: '🦁🌄',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#1A1200', accent: '#FDE68A',
+    what: 'Admit a weakness in your own argument openly, then explain why you are still right.',
+    hint: "Say 'Yes, it's true that… — but here's why that doesn't change my answer.'",
+    inspiration: 'Simba',
+    status: 'active',
+  },
+  {
+    id: 'm-b8', name: 'BE RESPONSIBLE', icon: '⭐🛡️',
+    tier: 'BRONZE', tierLabel: 'NOVICE',
+    bg: '#0F001A', accent: '#C4B5FD',
+    what: 'Argue for what is fair and good for everyone around you, not just what you want.',
+    hint: "Close with 'And that's why this is the right thing for all of us.'",
+    inspiration: 'Steven Universe',
+    status: 'active',
+  },
+  // ── SILVER tier ───────────────────────────────────────────────────────────
+  {
+    id: 'm1', name: 'THE CHARMING BLUFF', icon: '🗡️🎭',
+    tier: 'SILVER', tierLabel: 'TACTICIAN',
+    bg: '#1C2333', accent: '#A0AEC0',
+    what: 'Say something bold or wildly exaggerated and deliver it with total, unshakeable confidence.',
+    hint: 'Take the most outrageous version of your argument and state it like it is obvious fact.',
+    inspiration: 'Locke Lamora',
+    status: 'active',
+  },
+  {
+    id: 'm3', name: 'THE HONEST TALE', icon: '🎩🪵',
+    tier: 'SILVER', tierLabel: 'STORYTELLER',
+    bg: '#1A1200', accent: '#C8A96E',
+    what: 'Tell a short, folksy story or fable that makes your argument feel like pure common sense.',
+    hint: "Open with 'It reminds me of a time when…' and let the story do the persuading.",
+    inspiration: 'Abraham Lincoln',
+    status: 'active',
+  },
+  // ── GOLD tier ─────────────────────────────────────────────────────────────
+  {
+    id: 'm2', name: 'PAINT THE FUTURE', icon: '🌅🎨',
+    tier: 'GOLD', tierLabel: 'ORATOR',
+    bg: '#2D1B00', accent: '#ECC94B',
+    what: 'Abandon the current argument entirely and paint a vivid, irresistible picture of a better world.',
+    hint: "Start with 'Imagine a world where…' and make it feel so real they forget what they were arguing about.",
+    inspiration: 'Barack Obama',
+    status: 'active',
+  },
+  {
+    id: 'm4', name: 'THE BRIDGE BUILDER', icon: '🤝🧱',
+    tier: 'GOLD', tierLabel: 'MASTER',
+    bg: '#001A10', accent: '#68D391',
+    what: 'Find surprising common ground with your opponent, then show your solution serves both of you.',
+    hint: "Say 'We actually want the same thing — here's how my answer gets us both there.'",
+    inspiration: 'Nelson Mandela',
+    status: 'active',
+  },
+  // ── Add more Move Cards below ──────────────────────────────────────────────
+  // { id: 'm5', name: 'CARD NAME', icon: '🔥', tier: 'BRONZE', tierLabel: 'NOVICE',
+  //   bg: '#1A0000', accent: '#FC8181',
+  //   what: 'One sentence: what this move IS.',
+  //   hint: 'One sentence: the structural cue — how to actually do it.',
+  //   inspiration: 'Name', status: 'active' },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CASE CARDS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const CASE_CARDS = [
+  // ── Kid-friendly EASY cases ───────────────────────────────────────────────
+  {
+    id: 'c-k01', icon: '🦸📚', difficulty: 'EASY', status: 'active',
+    title: 'SUPERHEROES WOULD MAKE TERRIBLE TEACHERS',
+    description: "One side argues that flying, laser eyes, and saving the world make it impossible to run an orderly classroom. The other argues superpowers would make the best teachers imaginable.",
+  },
+  {
+    id: 'c-k02', icon: '🎮📝', difficulty: 'EASY', status: 'active',
+    title: 'VIDEO GAMES SHOULD COUNT AS HOMEWORK',
+    description: "One player argues that gaming builds real skills — strategy, reflexes, and teamwork — that belong in any school curriculum. The other defends the value of traditional homework.",
+  },
+  {
+    id: 'c-k03', icon: '🍦🧠', difficulty: 'EASY', status: 'active',
+    title: 'ICE CREAM FOR BREAKFAST WOULD MAKE KIDS SMARTER',
+    description: "One side argues happiness, sugar, and cold dairy first thing in the morning is the secret to a sharper brain. The other defends why breakfast rules exist.",
+  },
+  {
+    id: 'c-k04', icon: '🐶💛', difficulty: 'EASY', status: 'active',
+    title: "DOGS ARE TOO GOOD FOR US AND HUMANS DON'T DESERVE THEM",
+    description: "One player argues dogs are so loyal, so loving, and so patient that humanity has simply not earned them. The other defends humanity's worthiness of its best friend.",
+  },
+  {
+    id: 'c-k05', icon: '📚🌐', difficulty: 'EASY', status: 'active',
+    title: 'LIBRARIES ARE MORE POWERFUL THAN THE INTERNET',
+    description: "One side argues that silence, physical books, and a librarian's wisdom outperform any search engine. The other defends the limitless reach of the internet.",
+  },
+  {
+    id: 'c-k06', icon: '🦕🧐', difficulty: 'EASY', status: 'active',
+    title: 'DINOSAURS WERE SECRETLY MUCH SMARTER THAN WE THINK',
+    description: "One player builds the case for underestimated dinosaur intelligence. The other defends the scientific evidence as it stands.",
+  },
+  {
+    id: 'c-k07', icon: '🧦🛏️', difficulty: 'EASY', status: 'active',
+    title: 'WEARING SOCKS TO BED IS THE CORRECT WAY TO SLEEP',
+    description: "One side defends cosy, warm feet as the pinnacle of civilised bedtime behaviour. The other argues bare feet are the only acceptable option.",
+  },
+  {
+    id: 'c-k08', icon: '🌮📐', difficulty: 'EASY', status: 'active',
+    title: 'TACOS ARE MATHEMATICALLY THE PERFECT FOOD',
+    description: "One player builds a scientific and philosophical case for the taco as the peak of culinary engineering. The other challenges this audacious claim.",
+  },
+  {
+    id: 'c-k09', icon: '🚀👶', difficulty: 'EASY', status: 'active',
+    title: 'CHILDREN SHOULD BE FIRST IN LINE TO GO TO SPACE',
+    description: "One side argues kids are braver, more adaptable, and more curious — the perfect astronauts. The other defends why adults must lead the way.",
+  },
+  {
+    id: 'c-k10', icon: '🤖🏫', difficulty: 'EASY', status: 'active',
+    title: 'IF ROBOTS LIVE AMONG US THEY SHOULD HAVE TO GO TO SCHOOL',
+    description: "One player argues that robots need to learn the rules of society just like everyone else. The other challenges whether robots need school at all.",
+  },
+  {
+    id: 'c-k11', icon: '🦄🦴', difficulty: 'EASY', status: 'active',
+    title: 'UNICORNS WERE REAL ANIMALS THAT SIMPLY WENT EXTINCT',
+    description: "One side builds a compelling historical and scientific case for unicorns as real creatures. The other defends what we actually know about the fossil record.",
+  },
+  // ── Classic EASY cases ────────────────────────────────────────────────────
+  {
+    id: 'c1', icon: '🌙', difficulty: 'EASY', status: 'active',
+    title: 'KIDS SHOULD DECIDE THEIR OWN BEDTIME',
+    description: "One side defends the child's right to self-govern their sleep. The other upholds parental bedtime law. May the sharpest tongue win.",
+  },
+  {
+    id: 'c2', icon: '🍕', difficulty: 'EASY', status: 'active',
+    title: 'PIZZA IS A PERFECTLY VALID BREAKFAST FOOD',
+    description: "One player stands for the glory of morning pizza. The other defends the sacred tradition of breakfast. Convince — or be convinced.",
+  },
+  {
+    id: 'c3', icon: '🐱🕵️', difficulty: 'EASY', status: 'active',
+    title: 'CATS WOULD MAKE FAR BETTER UNDERCOVER SECRET AGENTS THAN DOGS',
+    description: "One side argues that cats are the perfect covert operatives. The other defends dogs as the ultimate agents of justice.",
+  },
+  {
+    id: 'c4', icon: '🌭⚖️', difficulty: 'EASY', focus: 'Definitions & Semantics', status: 'active',
+    title: 'HOT DOGS TECHNICALLY AND LEGALLY COUNT AS SANDWICHES',
+    description: "A battle of definitions and semantics. One player argues the hot dog is a sandwich. The other defends culinary tradition.",
+  },
+  // ── MEDIUM cases ──────────────────────────────────────────────────────────
+  {
+    id: 'c5', icon: '👽🌍', difficulty: 'MEDIUM', focus: 'Conspiracy vs. Logic', status: 'active',
+    title: 'ALIENS DEFINITELY EXIST AND ARE CURRENTLY HIDING ON EARTH',
+    description: "One player argues for the existence and presence of extraterrestrial life on Earth. The other defends logic and the burden of evidence.",
+  },
+  // ── HARD cases ────────────────────────────────────────────────────────────
+  {
+    id: 'c6', icon: '🪄⚙️', difficulty: 'HARD', focus: 'Chaos vs. Order', status: 'active',
+    title: 'A WORLD GOVERNED BY MAGIC WOULD BE WORSE THAN ONE GOVERNED BY TECHNOLOGY',
+    description: "One player defends the order and progress of technology. The other argues for the limitless possibilities of magic.",
+  },
+  // ── Add more Case Cards below ──────────────────────────────────────────────
+  // { id: 'c7', icon: '⚡', difficulty: 'MEDIUM', status: 'active',
+  //   title: 'CASE TITLE', description: '...' },
+];

@@ -10,9 +10,9 @@ A mobile card game for sharpening debate and rhetoric skills — built for a par
 
 Two players. One case. A hand of move cards.
 
-A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superheroes would make terrible teachers") to hard philosophical clashes ("A world of magic would be worse than a world of technology"). Each player is **dealt 2 Move Cards** — rhetorical techniques they can choose to use during their turn for a bonus point: tell a humble folktale, paint a vision of the future, find common ground, or bluff with absolute confidence.
+A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superheroes would make terrible teachers") to hard philosophical clashes ("A world of magic would be worse than a world of technology"). Each player is **dealt their own 2 Move Cards** — rhetorical techniques they can slip in at any point during their argument to earn a bonus point. Tell a humble folktale, paint a vision of the future, find common ground, or bluff with absolute confidence. They're suggestions, not requirements.
 
-Each player gets 5 minutes to speak. Then points are awarded — 1 for winning the argument, and a bonus point if you actually used a move card. Over time, the card pool expands from Bronze to Gold tier as you build real-world persuasion and storytelling skills.
+Each player's turn is timed by a depleting progress bar. Points are awarded — 1 for winning the argument, and a +1 bonus if they actually used a move card. Over time, the card pool expands from Bronze to Gold tier as players build real-world persuasion and storytelling skills.
 
 The app treats players as **junior debaters, not students** — members of the *Parlour of Minds*. Not here to learn. Here to practise.
 
@@ -23,7 +23,7 @@ The app treats players as **junior debaters, not students** — members of the *
 | Action | Points |
 |---|---|
 | Won the argument | +1 pt |
-| Used your move card | +1 bonus pt |
+| Slipped in a move card | +1 bonus pt |
 
 Maximum 2 points per player per round.
 
@@ -31,15 +31,16 @@ Maximum 2 points per player per round.
 
 ## Game Modes
 
-### 📅 Daily Quick Draw (Home screen)
+### Daily Quick Draw (Home screen)
 A pre-generated daily pairing — one Case Card and one Move Card of the Day — seeded from the date so it's identical for everyone. No browsing, no choosing. Tap **▶ Play Today's Round** and debate immediately. Foundation for the streak mechanic coming in V2.
 
 ### ⚔️ New Case (bottom nav)
-Full custom game. Browse and pick any case, get dealt 2 random move cards, play as many rounds as you want.
+Full custom game. Browse and pick a case + players in one screen, each player gets their own 2 random move cards, play as many rounds as you want.
 
 **Move card dealing rules:**
-- Fewer than 10 rounds in history → always dealt **NOVICE (Bronze)** cards — easier techniques suited to beginners
+- Fewer than 10 rounds in history → always dealt **NOVICE (Bronze)** cards
 - 10+ rounds → dealt from the full card pool (Bronze, Silver, Gold)
+- P1 and P2 always receive different cards (dealt like poker/UNO — no sharing)
 
 ### 🦊 Solo Dojo (bottom nav)
 Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill move cards alone through a 2-step interactive challenge per card:
@@ -51,26 +52,30 @@ Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill 
 
 ---
 
-## Cards
+## Move Cards
+
+Each card has two lines: **what** (what the move is) and **hint** (a structural cue — how to actually do it). Cards also carry a `status` field: `active | draft | archived`.
 
 ### Move Cards (12 included — Bronze · Silver · Gold tiers)
 
-| Card | Tier | Inspiration |
-|---|---|---|
-| The Fair Play | Bronze · Novice | Hermione Granger |
-| The Kind Heart | Bronze · Novice | Mister Rogers |
-| The Golden Rule | Bronze · Novice | Moana |
-| The Pinky Promise | Bronze · Novice | Pinocchio (reformed) |
-| The Team | Bronze · Novice | Paw Patrol |
-| The Best Friend | Bronze · Novice | Woody |
-| The Lion's Courage | Bronze · Novice | Simba |
-| Be Responsible | Bronze · Novice | Steven Universe |
-| The Charming Bluff | Silver · Tactician | Locke Lamora |
-| The Honest Tale | Silver · Storyteller | Abraham Lincoln |
-| Paint the Future | Gold · Orator | Barack Obama |
-| The Bridge Builder | Gold · Master | Nelson Mandela |
+| Card | Tier | What | Hint | Inspiration |
+|---|---|---|---|---|
+| The Fair Play | Bronze · Novice | Appeal to rules and fairness | "We all agreed that…" | Hermione Granger |
+| The Kind Heart | Bronze · Novice | Acknowledge feelings first, then pivot | "I understand why you feel that way…" | Mister Rogers |
+| The Golden Rule | Bronze · Novice | Find the deeper goal, serve everyone | "What's this REALLY about?" | Moana |
+| The Pinky Promise | Bronze · Novice | Commit with such certainty it becomes the argument | State specifics, no hesitation | Pinocchio (reformed) |
+| The Team | Bronze · Novice | Show how everyone benefits | "This helps [A], [B], and even [C]" | Paw Patrol |
+| The Best Friend | Bronze · Novice | Calmly hold your position under pressure | "I hear you — and I still believe…" | Woody |
+| The Lion's Courage | Bronze · Novice | Admit a weakness, then explain why you're still right | "Yes, it's true that… but…" | Simba |
+| Be Responsible | Bronze · Novice | Argue for what's fair for everyone | "That's why this is right for all of us." | Steven Universe |
+| The Charming Bluff | Silver · Tactician | Bold exaggeration with total confidence | State the outrageous version like obvious fact | Locke Lamora |
+| The Honest Tale | Silver · Storyteller | A folksy story that sounds like common sense | "It reminds me of a time when…" | Abraham Lincoln |
+| Paint the Future | Gold · Orator | Abandon the now, paint a better world | "Imagine a world where…" | Barack Obama |
+| The Bridge Builder | Gold · Master | Find common ground, show it serves both sides | "We actually want the same thing…" | Nelson Mandela |
 
 ### Case Cards (17 included — Easy · Medium · Hard)
+
+All case cards carry a `status` field: `active | draft | archived`.
 
 | Case | Difficulty |
 |---|---|
@@ -99,31 +104,52 @@ Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill 
 ```
 First launch → Account tab (add 2 players) → game launches automatically
 
-📅  Home tab → Daily Quick Draw card →
+Daily Quick Draw →
   1. Tap "▶ Play Today's Round"
-  2. Choose 2 players
-  3. DEBATE — case and Move of the Day pre-assigned, timer starts immediately
-  4. After each round: "Next Round" or "End Game & Score"
-  5. SCORE — reveal move cards, award points
+  2. Choose 2 players (PlayerPickScreen)
+  3. [Corner Time — 60s to plan, if enabled]
+  4. DEBATE — progress bar depletes; P1 debates with their move card
+  5. Pass phone to P2 (privacy cover screen)
+  6. [Corner Time — 60s for P2, if enabled]
+  7. P2 debates with their move card
+  8. After each round: "Next Round" or "End Game & Score"
+  9. SCORE — reveal move cards used, award points
 
-⚔️  New Case tab →
-  1. Choose 2 players
-  2. Browse case cards (sorted Easy → Hard, swipe or arrow)
-     — or tap 🎲 Random for a slot-machine pick ("🦊 Argus chooses...")
-  3. 2 move cards are dealt to both players (NOVICE only before 10 rounds in history)
-  4. DEBATE — 5-minute live timer per player
-     - Full case description visible at all times
-     - Your 2 dealt cards shown full-size; tap one to select it during your turn
-     - Tap "Done" to finish early and pass to opponent
-  5. After each round: "Next Round" or "End Game & Score"
-  6. SCORE — reveal chosen move cards, award points, save to history
+⚔️  New Case →
+  1. Browse case cards (sorted Easy → Hard, swipe or arrow)
+     — or tap 🎲 Random ("🦊 Argus chooses...")
+  2. Select Player 1 and Player 2 from inline dropdowns
+     (Player 1 speaks first, then Player 2)
+  3. Tap "Choose This Case" — each player is dealt their own 2 unique move cards
+  4. [Corner Time — 60s for P1 to plan, if enabled]
+  5. DEBATE — progress bar depletes as time runs out
+     - Case description always visible
+     - Your move cards shown — tap one to mark it as used (+1 bonus if correct)
+     - "Done — I'm Finished" ends the turn early
+  6. Pass phone to P2 (privacy cover screen)
+  7. [Corner Time — 60s for P2, if enabled]
+  8. P2 debates with their own different move cards
+  9. After each round: "Next Round" or "End Game & Score"
+  10. SCORE — reveal chosen move cards, award points, save to history
 
-🦊  Solo Dojo tab →
+🦊  Solo Dojo →
   1. Pick any unlocked move card from the list
   2. Step 1 — Argus presents a bad argument; spot the flaw (A / B / C)
   3. Step 2 — Complete the counter-argument using the move
   4. Drill marked complete; replay anytime
 ```
+
+---
+
+## Settings (Account tab)
+
+| Setting | Default | Description |
+|---|---|---|
+| Default Rounds | 1 | Rounds per game (1–10) |
+| Debate Time | 5 min | Player turn duration (1–15 min) |
+| Corner Time | ON | 60s planning window before each debate turn |
+
+**Corner Time** shows a depleting teal bar, the player's name chip, and their move cards — giving kids time to plan their argument before the debate clock starts. Players can tap "I'm Ready" to skip early.
 
 ---
 
@@ -138,13 +164,12 @@ The visual identity is **a debating club that a 9-year-old broke into and redeco
 | Ink Navy | `#0D0F1C` | Background |
 | Debate Gold | `#F5C842` | Primary accent, CTAs, highlights |
 | Parchment | `#E8DFC8` | Card text, secondary text |
-| Electric Teal | `#2ECFB0` | Daily draw, live indicators, player chips |
-| Argument Red | `#C0392B` | Timer danger state |
-| Bronze | `#8B6914` | Tier 1 card indicator |
+| Electric Teal | `#2ECFB0` | Daily draw, live indicators, player chips, Corner Time |
+| Argument Red | `#C0392B` | Progress bar danger state |
 
 ### Mascot: Argus
 
-Argus is a fox barrister — tiny curly wig (slightly tilted), teal waistcoat, gold pocket watch chain. He appears in the Solo Dojo as a sparring partner who **respects the player as a worthy opponent**, not a student.
+Argus is a fox barrister — tiny curly wig (slightly tilted), teal waistcoat, gold pocket watch chain. He appears in the Solo Dojo and Corner Time screen.
 
 Expression range: Confident · Suspicious · Dramatic · Smug · Encouraging · Thinking.
 
@@ -172,7 +197,7 @@ The game speaks like a sparring partner, not a teacher.
 |---|---|---|
 | Framework | **React Native + Expo SDK 54** | Single codebase for iOS and Android; Expo Go for instant dev testing |
 | Language | **JavaScript / React 19** | Fast iteration; no compile step |
-| Navigation | **Custom state machine** (`gamePhase` + `gameMode`) | No dependency overhead for a linear flow |
+| Navigation | **Custom state machine** (`gamePhase`) | No dependency overhead for a linear flow |
 | Animation | **React Native `Animated` API** | Built-in; powers card slide transitions and random spin |
 | Persistence | **AsyncStorage** | Players, settings, and completed drills survive app restarts |
 | Styling | **StyleSheet** | Native performance; no third-party UI lib |
@@ -183,21 +208,22 @@ The game speaks like a sparring partner, not a teacher.
 
 ```
 App.js          ← state machine + AsyncStorage (players, settings, completedDrills)
-data.js         ← MOVE_CARDS, CASE_CARDS, NAV_TABS, getDailyDraw(), dealMoveCards()
+cards.js        ← MOVE_CARDS + CASE_CARDS (content: what, hint, status fields)
+data.js         ← constants, utilities, getDailyDraw(), dealMoveCards(); re-exports cards
 drills.js       ← 2-step drill content for all 12 move cards (Argus Solo Dojo)
 styles.js       ← design tokens (C) + StyleSheet (S) — Ink & Spark palette
 components.js   ← Btn, CardBrowser, MovePickRow, BottomNav, card views
-screens.js      ← all 9 screens (Home, Help, Account, PlayerPick, Pass, Debate,
-                   RoundEnd, Points, SoloDojo)
+screens.js      ← all screens (Home, Help, Account, PlayerPick, CasePick, CornerTime,
+                   Pass, Debate, RoundEnd, Points, SoloDojo)
 app.json        ← Expo + EAS config; icon = argus_main_icon.png
-argus_main_icon.png              ← shield crest icon (app icon + dojo bubble)
-argus_expressions.png            ← 6-expression sprite (Confident/Suspicious/etc.)
-argus_expressions_shields_laurel.png ← shield-framed expressions (Dojo header)
+argus_main_icon.png   ← shield crest icon (app icon + dojo drill bubble)
+argus_confident.png   ← single confident fox (Solo Dojo header + Corner Time)
+argus_expressions.png ← 6-expression sprite (Confident/Suspicious/etc.)
 ```
 
-**To add a move card:** edit `data.js` (append to `MOVE_CARDS`) + add a matching entry to `drills.js`. Always **append** — inserting changes index positions and breaks the daily seed for that date.
+**To add a move card:** append to `MOVE_CARDS` in `cards.js` + add a matching entry to `drills.js`. Always **append** — inserting changes index positions and breaks the daily seed for that date.
 
-**To add a case card:** edit `data.js` only (append to `CASE_CARDS`).
+**To add a case card:** append to `CASE_CARDS` in `cards.js` only.
 
 ---
 
@@ -225,6 +251,6 @@ eas submit --platform ios
 
 ## Roadmap
 
-- **V1 (current)** — local pass-and-play, daily quick draw, dealt move cards, multi-round, scoring, player roster, history, Solo Dojo with Argus, AsyncStorage persistence, Ink & Spark design direction
+- **V1 (current)** — local pass-and-play, daily quick draw, inline case/player picker, Corner Time, depleting progress bar, configurable debate time, each player's own move cards, multi-round, scoring, player roster, history, Solo Dojo with Argus, AsyncStorage persistence, Ink & Spark design direction
 - **V2** — daily streak counter, audio recording + transcription (Apple Speech framework), LLM judge (Gemini Flash), structured verdict (winner + witty breakdown + feedback)
 - **V3** — player accounts, match history, remote multiplayer, card deck OTA updates via Firebase/Supabase

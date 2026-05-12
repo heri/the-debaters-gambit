@@ -120,7 +120,11 @@ export const S = StyleSheet.create({
   divider: { height: 1, width: '60%', alignSelf: 'center', marginBottom: 14, opacity: 0.5 },
   cardDesc: {
     fontSize: 15, color: 'rgba(232,223,200,0.9)',
-    lineHeight: 24, textAlign: 'center', marginBottom: 16,
+    lineHeight: 24, textAlign: 'center', marginBottom: 8,
+  },
+  cardHint: {
+    fontSize: 13, color: 'rgba(232,223,200,0.6)',
+    lineHeight: 22, textAlign: 'center', fontStyle: 'italic', marginBottom: 16,
   },
   cardInspo: { fontSize: 12, fontWeight: '700', textAlign: 'center', letterSpacing: 1.5, fontStyle: 'italic' },
 
@@ -165,6 +169,27 @@ export const S = StyleSheet.create({
   timerTxt: { fontSize: 38, fontWeight: '900', letterSpacing: 3 },
   playerChip: { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8 },
   playerChipTxt: { color: '#E8DFC8', fontWeight: '800', fontSize: 13, letterSpacing: 2 },
+
+  // Case picker — inline player selector dropdowns
+  playerSelectorBtn: {
+    backgroundColor: '#131728', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#1C2038',
+    paddingHorizontal: 10, paddingVertical: 8, marginBottom: 2,
+  },
+  playerSelectorLabel: {
+    fontSize: 9, fontWeight: '700', color: '#6B7A8D',
+    letterSpacing: 1.5, marginBottom: 4,
+  },
+  playerSelectorName: {
+    fontSize: 14, fontWeight: '800', color: '#E8DFC8', letterSpacing: 0.3,
+  },
+  playerSelectorCaret: { fontSize: 11, color: '#6B7A8D', marginTop: 2 },
+  playerSelectorOption: {
+    paddingVertical: 9, paddingHorizontal: 10,
+    borderRadius: 8, marginTop: 2,
+    backgroundColor: '#131728', borderWidth: 1, borderColor: '#1C2038',
+  },
+  playerSelectorOptionTxt: { fontSize: 13, fontWeight: '700', color: '#E8DFC8' },
 
   // Inline move picker (during debate)
   movePickRow: {

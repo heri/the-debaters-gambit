@@ -8,7 +8,7 @@ import {
   CASE_CARDS,
   NAV_TABS,
   sortedCases,
-  DEBATE_SECS,
+  DEFAULT_DEBATE_SECS,
 } from '../data';
 
 // ── formatTime ─────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ describe('formatTime', () => {
     expect(formatTime(90)).toBe('01:30');
   });
   test('formats the full debate duration (5 min) as 05:00', () => {
-    expect(formatTime(DEBATE_SECS)).toBe('05:00');
+    expect(formatTime(DEFAULT_DEBATE_SECS)).toBe('05:00');
   });
   test('formats 3599 seconds as 59:59', () => {
     expect(formatTime(3599)).toBe('59:59');
@@ -119,7 +119,8 @@ describe('getDailyDraw', () => {
     expect(moveCard).toHaveProperty('id');
     expect(moveCard).toHaveProperty('name');
     expect(moveCard).toHaveProperty('tier');
-    expect(moveCard).toHaveProperty('description');
+    expect(moveCard).toHaveProperty('what');
+    expect(moveCard).toHaveProperty('hint');
     expect(moveCard.name.length).toBeGreaterThan(0);
   });
   test('neither card is undefined or null', () => {
@@ -185,7 +186,8 @@ describe('dealMoveCards', () => {
       expect(card).toHaveProperty('name');
       expect(card).toHaveProperty('tier');
       expect(card).toHaveProperty('accent');
-      expect(card).toHaveProperty('description');
+      expect(card).toHaveProperty('what');
+      expect(card).toHaveProperty('hint');
     });
   });
   test('does not mutate the original MOVE_CARDS array', () => {
@@ -194,14 +196,44 @@ describe('dealMoveCards', () => {
     dealMoveCards(100);
     expect(MOVE_CARDS).toHaveLength(originalLength);
   });
+
+  // count=4 deals for two-player split (P1 gets slice(0,2), P2 gets slice(2,4))
+  test('count=4 returns exactly 4 cards', () => {
+    expect(dealMoveCards(0, 4)).toHaveLength(4);
+    expect(dealMoveCards(100, 4)).toHaveLength(4);
+  });
+  test('count=4 returns only BRONZE cards when history < 10', () => {
+    for (let h = 0; h <= 9; h++) {
+      expect(dealMoveCards(h, 4).every(c => c.tier === 'BRONZE')).toBe(true);
+    }
+  });
+  test('count=4 produces 4 unique card IDs (no duplicates)', () => {
+    for (let i = 0; i < 30; i++) {
+      const ids = dealMoveCards(0, 4).map(c => c.id);
+      expect(new Set(ids).size).toBe(4);
+    }
+    for (let i = 0; i < 30; i++) {
+      const ids = dealMoveCards(100, 4).map(c => c.id);
+      expect(new Set(ids).size).toBe(4);
+    }
+  });
+  test('P1 slice(0,2) and P2 slice(2,4) share no card IDs', () => {
+    for (let i = 0; i < 30; i++) {
+      const all4 = dealMoveCards(0, 4);
+      const p1Ids = new Set(all4.slice(0, 2).map(c => c.id));
+      const p2Ids = all4.slice(2, 4).map(c => c.id);
+      p2Ids.forEach(id => expect(p1Ids.has(id)).toBe(false));
+    }
+  });
 });
 
 // ── MOVE_CARDS integrity ───────────────────────────────────────────────────
 
 describe('MOVE_CARDS integrity', () => {
-  const REQUIRED_FIELDS = ['id', 'name', 'icon', 'tier', 'tierLabel', 'bg', 'accent', 'description', 'inspiration'];
+  const REQUIRED_FIELDS = ['id', 'name', 'icon', 'tier', 'tierLabel', 'bg', 'accent', 'what', 'hint', 'inspiration', 'status'];
   const VALID_TIERS = ['BRONZE', 'SILVER', 'GOLD'];
   const VALID_TIER_LABELS = ['NOVICE', 'TACTICIAN', 'STORYTELLER', 'ORATOR', 'MASTER'];
+  const VALID_STATUSES = ['active', 'draft', 'archived'];
   const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
   test('array is non-empty', () => {
@@ -241,10 +273,21 @@ describe('MOVE_CARDS integrity', () => {
       expect(card.accent).toMatch(HEX_COLOR);
     });
   });
-  test('no card has an empty name or description', () => {
+  test('no card has an empty name, what, or hint', () => {
     MOVE_CARDS.forEach(card => {
       expect(card.name.trim().length).toBeGreaterThan(0);
-      expect(card.description.trim().length).toBeGreaterThan(0);
+      expect(card.what.trim().length).toBeGreaterThan(0);
+      expect(card.hint.trim().length).toBeGreaterThan(0);
+    });
+  });
+  test('all statuses are valid', () => {
+    MOVE_CARDS.forEach(card => {
+      expect(VALID_STATUSES).toContain(card.status);
+    });
+  });
+  test('all current cards have status active', () => {
+    MOVE_CARDS.filter(c => c.status !== 'archived').forEach(card => {
+      expect(['active', 'draft']).toContain(card.status);
     });
   });
   test('BRONZE cards all have tierLabel NOVICE', () => {
@@ -257,8 +300,9 @@ describe('MOVE_CARDS integrity', () => {
 // ── CASE_CARDS integrity ───────────────────────────────────────────────────
 
 describe('CASE_CARDS integrity', () => {
-  const REQUIRED_FIELDS = ['id', 'title', 'description', 'difficulty', 'icon'];
+  const REQUIRED_FIELDS = ['id', 'title', 'description', 'difficulty', 'icon', 'status'];
   const VALID_DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
+  const VALID_STATUSES = ['active', 'draft', 'archived'];
 
   test('array is non-empty', () => {
     expect(CASE_CARDS.length).toBeGreaterThan(0);
@@ -283,6 +327,11 @@ describe('CASE_CARDS integrity', () => {
     CASE_CARDS.forEach(card => {
       expect(card.title.trim().length).toBeGreaterThan(0);
       expect(card.description.trim().length).toBeGreaterThan(0);
+    });
+  });
+  test('all case card statuses are valid', () => {
+    CASE_CARDS.forEach(card => {
+      expect(VALID_STATUSES).toContain(card.status);
     });
   });
   test('move card IDs and case card IDs do not overlap', () => {

@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
+  View, Text, TouchableOpacity, ScrollView, Animated, Dimensions,
   TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
-import { CARD_W, DEBATE_SECS, MOVE_CARDS, formatTime, timerColor } from './data';
+import { CARD_W, DEFAULT_DEBATE_SECS, MOVE_CARDS, sortedCases, formatTime, timerColor } from './data';
 import { DRILLS } from './drills';
 import { C, S } from './styles';
 import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner } from './components';
+
+const { width: SCREEN_W } = Dimensions.get('window');
 
 // ── Home ───────────────────────────────────────────────────────────────────
 // dailyDraw: { caseCard, moveCard } — pre-seeded by today's date
@@ -26,7 +28,7 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay }) => (
       onPress={canPlay ? onPlayDaily : null}
       activeOpacity={0.85}
     >
-      <Text style={S.dailyLabel}>📅  TODAY'S QUICK DRAW</Text>
+      <Text style={S.dailyLabel}>TODAY'S QUICK DRAW</Text>
       <Text style={S.dailyCaseTitle} numberOfLines={2}>
         {dailyDraw.caseCard.title}
       </Text>
@@ -105,20 +107,21 @@ export const HelpScreen = () => (
       <Text style={S.helpRuleNum}>1</Text>
       <Text style={S.helpRuleText}>
         <Text style={{ color: C.gold }}>Choose a Case</Text> — the debate topic both players will argue.
+        Use the dropdowns below the case card to select who is playing.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt 2 Move Cards from the deck.
-        Beginners always receive easier NOVICE cards. You can play one for +1 bonus point, or skip entirely.
+        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt their own 2 Move Cards.
+        Beginners get easier NOVICE cards. Slip one in at any point during your argument to earn a +1 bonus — no pressure, they're optional.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Debate</Text> — each player gets 5 minutes with the timer running.
-        Your 2 dealt cards are shown — tap one to select it during your turn.
+        <Text style={{ color: C.gold }}>Debate</Text> — each player gets a timed turn. The bar at the top
+        starts full and depletes as time runs out. Your dealt cards are shown — tap one to select it.
       </Text>
     </View>
     <View style={S.helpRule}>
@@ -153,7 +156,7 @@ export const HelpScreen = () => (
 
 // ── Account ────────────────────────────────────────────────────────────────
 
-export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRoundsChange, history, isOnboarding }) => {
+export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRoundsChange, debateSecs, onDebateSecsChange, cornerTimeEnabled, onCornerTimeChange, history, isOnboarding }) => {
   const [name, setName] = useState('');
 
   const submit = () => {
@@ -234,6 +237,51 @@ export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRound
               <Text style={S.stepBtnTxt}>+</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={S.settingRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={S.settingLabel}>DEBATE TIME</Text>
+            <Text style={S.settingSubLabel}>Minutes per player turn</Text>
+          </View>
+          <View style={S.stepper}>
+            <TouchableOpacity
+              style={S.stepBtn}
+              onPress={() => onDebateSecsChange(Math.max(60, debateSecs - 60))}
+            >
+              <Text style={S.stepBtnTxt}>−</Text>
+            </TouchableOpacity>
+            <Text style={S.stepValue}>{debateSecs / 60} min</Text>
+            <TouchableOpacity
+              style={S.stepBtn}
+              onPress={() => onDebateSecsChange(Math.min(900, debateSecs + 60))}
+            >
+              <Text style={S.stepBtnTxt}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={S.settingRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={S.settingLabel}>CORNER TIME</Text>
+            <Text style={S.settingSubLabel}>60s to plan before each turn</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onCornerTimeChange(!cornerTimeEnabled)}
+            style={{
+              paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+              backgroundColor: cornerTimeEnabled ? C.teal : C.border,
+              borderWidth: 1.5,
+              borderColor: cornerTimeEnabled ? C.teal : C.muted,
+            }}
+          >
+            <Text style={{
+              fontSize: 11, fontWeight: '900', letterSpacing: 1.5,
+              color: cornerTimeEnabled ? '#0D0F1C' : C.muted,
+            }}>
+              {cornerTimeEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {history.length > 0 ? (
@@ -330,6 +378,187 @@ export const PlayerPickScreen = ({ players, onConfirm }) => {
   );
 };
 
+// ── Case picker with inline player selection (new_case flow) ──────────────
+// players: all registered players
+// onConfirm(caseCard, p1, p2) — called when user locks in their choice
+
+export const CasePickScreen = ({ players, onConfirm }) => {
+  const [idx, setIdx] = useState(0);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [p1, setP1] = useState(players.length > 0 ? players[0] : null);
+  const [p2, setP2] = useState(players.length > 1 ? players[1] : null);
+  const [p1Open, setP1Open] = useState(false);
+  const [p2Open, setP2Open] = useState(false);
+  const translateX = useRef(new Animated.Value(0)).current;
+  const touchStartX = useRef(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => () => { isMounted.current = false; }, []);
+
+  if (players.length < 2) {
+    return (
+      <View style={S.screen}>
+        <Text style={S.heroTitle}>NEED MORE{'\n'}PLAYERS</Text>
+        <Text style={[S.hint, { marginTop: 16 }]}>
+          Go to 👤 Account to add at least 2 players.
+        </Text>
+      </View>
+    );
+  }
+
+  const slide = (dir, afterCb) => {
+    Animated.timing(translateX, {
+      toValue: dir * -SCREEN_W, duration: 200, useNativeDriver: true,
+    }).start(() => {
+      translateX.setValue(dir * SCREEN_W);
+      afterCb();
+      Animated.timing(translateX, { toValue: 0, duration: 200, useNativeDriver: true }).start();
+    });
+  };
+
+  const goNext = () => {
+    if (!isSpinning && idx < sortedCases.length - 1) slide(1, () => setIdx(i => i + 1));
+  };
+  const goPrev = () => {
+    if (!isSpinning && idx > 0) slide(-1, () => setIdx(i => i - 1));
+  };
+
+  const onTouchStart = e => { touchStartX.current = e.nativeEvent.pageX; };
+  const onTouchEnd = e => {
+    if (touchStartX.current === null || isSpinning) return;
+    const dx = e.nativeEvent.pageX - touchStartX.current;
+    touchStartX.current = null;
+    if (dx < -40) goNext(); else if (dx > 40) goPrev();
+  };
+
+  const handleRandom = () => {
+    if (isSpinning) return;
+    const targetIdx = Math.floor(Math.random() * sortedCases.length);
+    const stepsToTarget = (targetIdx - idx + sortedCases.length) % sortedCases.length;
+    const totalSteps = 2 * sortedCases.length + (stepsToTarget || sortedCases.length);
+    let step = 0; let cur = idx;
+    setIsSpinning(true);
+    const spin = () => {
+      if (!isMounted.current) return;
+      cur = (cur + 1) % sortedCases.length;
+      setIdx(cur); step++;
+      if (step < totalSteps) {
+        const progress = step / totalSteps;
+        const delay = progress < 0.5 ? 55 : progress < 0.75 ? 95 : progress < 0.9 ? 160 : 280;
+        setTimeout(spin, delay);
+      } else {
+        setIsSpinning(false);
+      }
+    };
+    setTimeout(spin, 0);
+  };
+
+  const canConfirm = p1 && p2 && p1.id !== p2.id;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={S.browserHeader}>
+        <Text style={S.screenTitle}>CHOOSE A CASE</Text>
+        <View style={S.dots}>
+          {sortedCases.map((_, i) => (
+            <View key={i} style={[S.dot, i === idx && S.dotActive]} />
+          ))}
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={S.scrollContent} showsVerticalScrollIndicator={false}>
+        <Animated.View
+          style={{ transform: [{ translateX }], width: CARD_W }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          <CaseCardView card={sortedCases[idx]} />
+        </Animated.View>
+
+        <View style={S.navRow}>
+          <TouchableOpacity
+            onPress={goPrev}
+            disabled={idx === 0 || isSpinning}
+            style={[S.navArrow, (idx === 0 || isSpinning) && { opacity: 0.25 }]}
+          >
+            <Text style={S.navArrowTxt}>‹  PREV</Text>
+          </TouchableOpacity>
+          <Text style={S.navCounter}>{idx + 1} / {sortedCases.length}</Text>
+          <TouchableOpacity
+            onPress={goNext}
+            disabled={idx === sortedCases.length - 1 || isSpinning}
+            style={[S.navArrow, (idx === sortedCases.length - 1 || isSpinning) && { opacity: 0.25 }]}
+          >
+            <Text style={S.navArrowTxt}>NEXT  ›</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ width: CARD_W, marginTop: 12 }}>
+          <Text style={[S.hint, { marginBottom: 12, textAlign: 'center' }]}>
+            Player 1 speaks first, then Player 2
+          </Text>
+
+          <Text style={S.playerSelectorLabel}>PLAYER 1</Text>
+          <TouchableOpacity
+            style={S.playerSelectorBtn}
+            onPress={() => { setP1Open(o => !o); setP2Open(false); }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={S.playerSelectorName}>{p1 ? p1.name : 'Select player…'}</Text>
+              <Text style={S.playerSelectorCaret}>{p1Open ? '▲' : '▼'}</Text>
+            </View>
+          </TouchableOpacity>
+          {p1Open ? players.map(p => (
+            <TouchableOpacity
+              key={p.id}
+              style={S.playerSelectorOption}
+              onPress={() => { setP1(p); if (p2?.id === p.id) setP2(null); setP1Open(false); }}
+            >
+              <Text style={S.playerSelectorOptionTxt}>{p.name}</Text>
+            </TouchableOpacity>
+          )) : null}
+
+          <View style={{ height: 12 }} />
+
+          <Text style={S.playerSelectorLabel}>PLAYER 2</Text>
+          <TouchableOpacity
+            style={S.playerSelectorBtn}
+            onPress={() => { setP2Open(o => !o); setP1Open(false); }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={S.playerSelectorName}>{p2 ? p2.name : 'Select player…'}</Text>
+              <Text style={S.playerSelectorCaret}>{p2Open ? '▲' : '▼'}</Text>
+            </View>
+          </TouchableOpacity>
+          {p2Open ? players.map(p => (
+            <TouchableOpacity
+              key={p.id}
+              style={S.playerSelectorOption}
+              onPress={() => { setP2(p); if (p1?.id === p.id) setP1(null); setP2Open(false); }}
+            >
+              <Text style={S.playerSelectorOptionTxt}>{p.name}</Text>
+            </TouchableOpacity>
+          )) : null}
+        </View>
+
+        <Btn
+          label="✓  CHOOSE THIS CASE"
+          onPress={() => onConfirm(sortedCases[idx], p1, p2)}
+          disabled={isSpinning || !canConfirm}
+          style={{ marginTop: 16 }}
+        />
+        <Btn
+          label={isSpinning ? '🦊  ARGUS CHOOSES...' : '🎲  RANDOM'}
+          variant="secondary"
+          onPress={handleRandom}
+          disabled={isSpinning}
+          style={{ marginBottom: 40 }}
+        />
+      </ScrollView>
+    </View>
+  );
+};
+
 // ── Privacy pass-phone cover ───────────────────────────────────────────────
 
 export const PassScreen = ({ name, onReady }) => (
@@ -344,13 +573,82 @@ export const PassScreen = ({ name, onReady }) => (
   </View>
 );
 
-// ── Debate: live timer + dealt move card picker ────────────────────────────
-// availableMoves: Card[] — 1 card (daily) or 2 cards (new case), dealt by App.
-// Player picks one or none during their own turn.
+// ── Corner Time: 60-second planning window before each debate turn ─────────
+// Gives players a moment to read their move cards and plan their argument.
+// Auto-advances when the 60s countdown expires; player can also skip early.
+
+export const CornerTimeScreen = ({ player, moves, onReady }) => {
+  const [secondsLeft, setSecondsLeft] = useState(60);
+  const intervalRef = useRef(null);
+  const calledReady = useRef(false);
+
+  const fireReady = () => {
+    if (calledReady.current) return;
+    calledReady.current = true;
+    clearInterval(intervalRef.current);
+    onReady();
+  };
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) { clearInterval(intervalRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (secondsLeft === 0) fireReady();
+  }, [secondsLeft]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ height: 4, backgroundColor: C.border }}>
+        <View style={{ width: `${Math.round(secondsLeft / 60 * 100)}%`, height: 4, backgroundColor: C.teal }} />
+      </View>
+
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 40, paddingBottom: 48 }]}>
+        <Text style={S.screenLabel}>CORNER TIME  ·  {secondsLeft}s</Text>
+
+        <View style={[S.playerChip, { backgroundColor: C.teal, marginVertical: 12 }]}>
+          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}</Text>
+        </View>
+
+        <Image
+          source={require('./argus_confident.png')}
+          style={{ width: CARD_W * 0.44, height: CARD_W * 0.44, resizeMode: 'contain', alignSelf: 'center', marginBottom: 8 }}
+        />
+
+        <Text style={[S.hint, { marginBottom: 24 }]}>
+          Read your move cards.{'\n'}Jot a note. Plan your argument.
+        </Text>
+
+        {moves.length > 0 ? (
+          <>
+            <Text style={[S.screenLabel, { marginBottom: 12 }]}>YOUR MOVE CARDS</Text>
+            {moves.map(card => <MoveCardView key={card.id} card={card} />)}
+          </>
+        ) : null}
+
+        <Btn
+          label="I'M READY  →"
+          onPress={fireReady}
+          style={{ marginTop: 24 }}
+        />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Debate: depleting progress bar + dealt move card picker ───────────────
+// moves: Card[] — each player's own 2 dealt cards (or 1 for daily mode)
+// debateSecs: total seconds for this player's turn (configurable from Account)
 // onDone(selectedMove | null) hands control back to the parent.
 
-export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves, onDone }) => {
-  const [secondsLeft, setSecondsLeft] = useState(DEBATE_SECS);
+export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSecs = DEFAULT_DEBATE_SECS, onDone }) => {
+  const [secondsLeft, setSecondsLeft] = useState(debateSecs);
   const [selectedMove, setSelectedMove] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const intervalRef = useRef(null);
@@ -374,14 +672,21 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves,
   const toggleMove = card =>
     setSelectedMove(prev => (prev?.id === card.id ? null : card));
 
-  const movePickerLabel = availableMoves.length === 1
-    ? 'YOUR MOVE CARD — OPTIONAL  (+1 BONUS PT)'
-    : 'YOUR 2 DEALT CARDS — PICK ONE OR NONE  (+1 BONUS PT)';
+  const movePickerLabel = moves.length === 1
+    ? 'YOUR MOVE CARD — slip it in any time for +1 bonus  ⭐'
+    : 'YOUR MOVE CARDS — slip one in any time for +1 bonus  ⭐';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={[S.timerBanner, { borderColor: tColor + '55', backgroundColor: tColor + '14' }]}>
-        <Text style={[S.timerTxt, { color: tColor }]}>{formatTime(secondsLeft)}</Text>
+      {/* Depleting progress bar — starts full, empties as time runs out */}
+      <View style={{ height: 5, backgroundColor: C.border, width: '100%' }}>
+        <View style={{
+          width: debateSecs > 0 ? `${Math.round(secondsLeft / debateSecs * 100)}%` : '0%',
+          height: 5,
+          backgroundColor: tColor,
+        }} />
+      </View>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface }}>
         <View style={[S.playerChip, { backgroundColor: C.teal }]}>
           <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}</Text>
         </View>
@@ -392,14 +697,14 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, availableMoves,
 
         <View style={S.scoringHint}>
           <Text style={S.scoringHintTxt}>
-            ⚔️  1 pt for winning  ·  ⭐ +1 pt if you use a move card
+            ⚔️  1 pt for winning  ·  ⭐ +1 bonus if you slip in a move
           </Text>
         </View>
 
-        {availableMoves.length > 0 ? (
+        {moves.length > 0 ? (
           <>
             <Text style={[S.screenLabel, { marginTop: 20 }]}>{movePickerLabel}</Text>
-            {availableMoves.map(card => {
+            {moves.map(card => {
               const selected = selectedMove?.id === card.id;
               const dimmed = selectedMove !== null && !selected;
               return (
@@ -693,7 +998,7 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
           Pick a move card to drill alone.{'\n'}Argus will challenge you!
         </Text>
         <Image
-          source={require('./argus_expressions_shields_laurel.png')}
+          source={require('./argus_confident.png')}
           style={{ width: CARD_W, height: CARD_W * 0.66, resizeMode: 'contain', marginBottom: 8, opacity: 0.92 }}
         />
 

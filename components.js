@@ -52,7 +52,8 @@ export const MoveCardView = ({ card, compact }) => (
     {!compact ? (
       <>
         <View style={[S.divider, { backgroundColor: card.accent }]} />
-        <Text style={S.cardDesc}>{card.description}</Text>
+        <Text style={S.cardDesc}>{card.what}</Text>
+        <Text style={S.cardHint}>{card.hint}</Text>
       </>
     ) : null}
     <Text style={[S.cardInspo, { color: card.accent }]}>✦  {card.inspiration}</Text>
