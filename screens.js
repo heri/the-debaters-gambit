@@ -998,7 +998,7 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
           Pick a move card to drill alone.{'\n'}Argus will challenge you!
         </Text>
         <Image
-          source={require('./argus_confident.png')}
+          source={require('./argus_encouraging.png')}
           style={{ width: CARD_W, height: CARD_W * 0.66, resizeMode: 'contain', marginBottom: 8, opacity: 0.92 }}
         />
 
@@ -1092,8 +1092,8 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
         <View style={S.argusBubble}>
           <View style={S.argusBubbleHeader}>
             <Image
-              source={require('./argus_main_icon.png')}
-              style={{ width: 44, height: 44, borderRadius: 10, marginRight: 10 }}
+              source={require('./argus_thinking.png')}
+              style={{ width: 44, height: 44, resizeMode: 'contain', marginRight: 10 }}
             />
             <Text style={S.argusName}>ARGUS</Text>
           </View>
@@ -1118,6 +1118,10 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
 
         {phase === 'feedback' ? (
           <>
+            <Image
+              source={wasCorrect ? require('./argus_confident.png') : require('./argus_dramatic.png')}
+              style={{ width: CARD_W * 0.35, height: CARD_W * 0.35, resizeMode: 'contain', alignSelf: 'center', marginTop: 16, marginBottom: 4 }}
+            />
             <View style={[S.drillFeedback, wasCorrect ? S.drillFeedbackOk : S.drillFeedbackOops]}>
               <Text style={S.drillFeedbackTxt}>
                 {wasCorrect ? currentStep.feedbackOk : currentStep.feedbackOops}

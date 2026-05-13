@@ -192,6 +192,56 @@ export const CASE_CARDS = [
     title: 'UNICORNS WERE REAL ANIMALS THAT SIMPLY WENT EXTINCT',
     description: "One side builds a compelling historical and scientific case for unicorns as real creatures. The other defends what we actually know about the fossil record.",
   },
+  {
+    id: 'c-k12', icon: '🧠👯', difficulty: 'EASY', status: 'active',
+    title: "SIBLINGS WOULD BE HAPPIER IF THEY COULD READ EACH OTHER'S MINDS",
+    description: "One side argues that perfect honesty would end all arguments and build unbreakable friendship. The other warns of the total disaster of knowing your brother is plotting to eat your dessert.",
+  },
+  {
+    id: 'c-k13', icon: '😠🪑', difficulty: 'EASY', status: 'active',
+    title: 'PARENTS SHOULD HAVE TO TAKE TIMEOUTS WHEN THEY GET CRANKY',
+    description: "One player argues that adults need to practice the same emotional control and respect they teach kids. The other defends a parent's right to be grumpily in charge.",
+  },
+  {
+    id: 'c-k14', icon: '🎲🤥', difficulty: 'EASY', status: 'active',
+    title: 'LOSING A GAME ON PURPOSE TO BE NICE IS ACTUALLY LYING',
+    description: "One side argues that true respect and honesty mean playing your best, even if your friend loses. The other defends losing on purpose as a supreme act of compassion.",
+  },
+  {
+    id: 'c-k15', icon: '🐕🧹', difficulty: 'EASY', status: 'active',
+    title: 'HOUSEHOLD PETS SHOULD HAVE TO DO CHORES TO EARN THEIR KEEP',
+    description: "One player claims it's only fair that dogs and cats learn the value of hard work and responsibility. The other defends their sacred right to sleep all day and look cute doing it.",
+  },
+  {
+    id: 'c-k16', icon: '🕷️🤝', difficulty: 'EASY', status: 'active',
+    title: 'SPIDERS SHOULD BE TREATED LIKE HELPFUL TINY ROOMMATES, NOT MONSTERS',
+    description: "One side argues for compassion, noting spiders eat pests and work hard on their webs. The other defends the absolute right to peacefully scream and run away.",
+  },
+  {
+    id: 'c-k17', icon: '🥪❤️', difficulty: 'EASY', status: 'active',
+    title: 'SHARING YOUR LUNCH SHOULD BE A GRADUATION REQUIREMENT',
+    description: "One player argues that generosity and kindness are more important than math or reading. The other argues that personal property (especially cookies) must be protected at all costs.",
+  },
+  {
+    id: 'c-k18', icon: '🤦‍♂️🚫', difficulty: 'EASY', status: 'active',
+    title: 'KIDS SHOULD BE ALLOWED TO GROUND PARENTS FOR TELLING TERRIBLE JOKES',
+    description: "One side argues that terrible dad jokes cause unnecessary suffering and require strict disciplinary action. The other defends the freedom to be painfully unfunny.",
+  },
+  {
+    id: 'c-k19', icon: '🎮🛑', difficulty: 'EASY', status: 'active',
+    title: 'CHEATING IN A SINGLE-PLAYER VIDEO GAME IS STILL MORALLY WRONG',
+    description: "One player argues that honesty matters even when no one is watching, and cheating breaks the spirit of the game. The other argues it's just pixels and having fun is all that matters.",
+  },
+  {
+    id: 'c-k20', icon: '🪑🙏', difficulty: 'EASY', status: 'active',
+    title: 'APOLOGIZING TO FURNITURE WHEN YOU BUMP INTO IT IS THE HIGHEST FORM OF RESPECT',
+    description: "One side argues that practicing universal kindness, even to tables and doors, makes you a better person. The other points out that tables absolutely do not have feelings.",
+  },
+  {
+    id: 'c-k21', icon: '🦓⚽', difficulty: 'EASY', status: 'active',
+    title: 'ANIMALS WOULD BE FAR FAIRER REFEREES IN SPORTS THAN HUMANS',
+    description: "One player argues that animals don't care about money or favorite teams, making them perfectly unbiased. The other points out that a dog referee would just steal the soccer ball.",
+  },
   // ── Classic EASY cases ────────────────────────────────────────────────────
   {
     id: 'c1', icon: '🌙', difficulty: 'EASY', status: 'active',
