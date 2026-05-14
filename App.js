@@ -1,4 +1,4 @@
-// The Debater's Gambit — v4.1
+// The Debater's Gambit — v5.0
 // App.js is the state machine and persistence layer only.
 // Card data → data.js  |  Styles → styles.js  |  Components → components.js  |  Screens → screens.js
 
@@ -8,25 +8,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
-import { uid, DEFAULT_DEBATE_SECS, getDailyDraw, dealMoveCards } from './data';
+import { uid, DEFAULT_DEBATE_SECS, getDailyDraw, dealCards, drawOneCard } from './data';
 import { S } from './styles';
 import { BottomNav } from './components';
 import {
   HomeScreen, HelpScreen, AccountScreen,
   PlayerPickScreen, CasePickScreen, CornerTimeScreen, PassScreen, DebateScreen,
+  CounterWindowScreen, CounterScreen, PlayerWinsScreen,
   RoundEndScreen, PointsScreen, SoloDojoScreen,
 } from './screens';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAME FLOWS
-//   new_case – tap ⚔️: pick_case → debate_p1 → pass_to_p2 → debate_p2
-//              → round_end → [repeat | points]
-//              Player selection + case browsing happen together in CasePickScreen.
-//              Each player is dealt their own 2 move cards (no sharing).
+//   new_case – pick_case → [corner_time_p1] → debate_p1
+//              → pass_to_p2 → [counter_window_p2] → [counter_p2]
+//              → [corner_time_p2] → debate_p2 → round_end → [repeat | points]
 //
-//   daily    – tap ▶ Quick Draw: pick_players → debate_p1 → pass_to_p2
-//              → debate_p2 → round_end → [repeat | points]
-//              Case and move card are pre-seeded from today's date.
+//   daily    – pick_players → [corner_time_p1] → debate_p1 → pass_to_p2
+//              → [corner_time_p2] → debate_p2 → round_end → [repeat | points]
+//              (daily uses move cards only — no hazard/counter)
+//
+//   win      – when a player uses all their cards → player_wins → points
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function App() {
@@ -46,8 +48,24 @@ export default function App() {
   const [player1, setPlayer1] = useState(null);
   const [player2, setPlayer2] = useState(null);
   const [selectedCase, setSelectedCase] = useState(null);
-  const [p1Moves, setP1Moves] = useState([]);
-  const [p2Moves, setP2Moves] = useState([]);
+
+  // Each player's full hand: mix of move / hazard / counter cards
+  const [p1Cards, setP1Cards] = useState([]);
+  const [p2Cards, setP2Cards] = useState([]);
+
+  // Track which card IDs have been used (played or played as counter/hazard)
+  const [p1UsedCardIds, setP1UsedCardIds] = useState([]);
+  const [p2UsedCardIds, setP2UsedCardIds] = useState([]);
+
+  // Hazard card currently applied to the next player's debate turn
+  const [activeHazard, setActiveHazard] = useState(null);
+
+  // Counter card selected during counter window
+  const [activeCounterCard, setActiveCounterCard] = useState(null);
+
+  // Player who used all their cards
+  const [winningPlayer, setWinningPlayer] = useState(null);
+
   const [debateSecs, setDebateSecs] = useState(DEFAULT_DEBATE_SECS);
   const [cornerTimeEnabled, setCornerTimeEnabled] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);
@@ -67,8 +85,8 @@ export default function App() {
   // ── Load from AsyncStorage on mount ─────────────────────────────────────
   useEffect(() => {
     AsyncStorage.multiGet(['players', 'settings', 'completedDrills']).then(results => {
-      const playersRaw        = results[0][1];
-      const settingsRaw       = results[1][1];
+      const playersRaw         = results[0][1];
+      const settingsRaw        = results[1][1];
       const completedDrillsRaw = results[2][1];
 
       if (playersRaw) {
@@ -82,8 +100,8 @@ export default function App() {
 
       if (settingsRaw) {
         const s = JSON.parse(settingsRaw);
-        if (s.defaultRounds) setDefaultRounds(s.defaultRounds);
-        if (s.debateSecs) setDebateSecs(s.debateSecs);
+        if (s.defaultRounds)              setDefaultRounds(s.defaultRounds);
+        if (s.debateSecs)                 setDebateSecs(s.debateSecs);
         if (s.cornerTimeEnabled !== undefined) setCornerTimeEnabled(s.cornerTimeEnabled);
       }
 
@@ -128,15 +146,23 @@ export default function App() {
     }
   };
 
+  // ── Win condition check ──────────────────────────────────────────────────
+  // Returns the winning player object if they've used all their cards, else null.
+  const checkWin = (usedIds, hand, player) => {
+    if (hand.length > 0 && usedIds.length >= hand.length) return player;
+    return null;
+  };
+
   // ── Game management ──────────────────────────────────────────────────────
   const resetGame = (mode = 'new_case') => {
     setPlayer1(null); setPlayer2(null); setSelectedCase(null);
-    setP1Moves([]); setP2Moves([]);
+    setP1Cards([]); setP2Cards([]);
+    setP1UsedCardIds([]); setP2UsedCardIds([]);
+    setActiveHazard(null); setActiveCounterCard(null);
+    setWinningPlayer(null);
     setCurrentRound(1);
     setCurrentP1Move(null); setCurrentP2Move(null);
     setRoundHistory([]);
-    // new_case: player selection is inline in CasePickScreen — skip pick_players
-    // daily: still shows PlayerPickScreen first
     setGamePhase(mode === 'new_case' ? 'pick_case' : 'pick_players');
   };
 
@@ -145,18 +171,95 @@ export default function App() {
     setActiveTab(tab);
   };
 
-  // Launch the daily draw from the Home screen Quick Draw card.
-  // Pre-loads case + the daily move card so pick_case is skipped entirely.
   const handlePlayDaily = () => {
     resetGame('daily');
     setSelectedCase(dailyDraw.caseCard);
-    setP1Moves([dailyDraw.moveCard]);
-    setP2Moves([dailyDraw.moveCard]);
+    // Daily mode: move cards only (one each, shared card is fine for quick draw)
+    setP1Cards([dailyDraw.moveCard]);
+    setP2Cards([dailyDraw.moveCard]);
     setActiveTab('game');
   };
 
-  const handleP1Done = (move, _note) => { setCurrentP1Move(move); setGamePhase('pass_to_p2'); };
-  const handleP2Done = (move, _note) => { setCurrentP2Move(move); setGamePhase('round_end'); };
+  // ── P1 finishes arguing ──────────────────────────────────────────────────
+  const handleP1Done = (moveCard, _note, hazardCard) => {
+    setActiveHazard(null); // clear any hazard that was applied to P1 this turn
+    setCurrentP1Move(moveCard);
+
+    const newUsed = [...p1UsedCardIds];
+    if (moveCard)   newUsed.push(moveCard.id);
+    if (hazardCard) newUsed.push(hazardCard.id);
+    setP1UsedCardIds(newUsed);
+    if (hazardCard) setActiveHazard(hazardCard);
+
+    const winner = checkWin(newUsed, p1Cards, player1);
+    if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
+
+    setGamePhase('pass_to_p2');
+  };
+
+  // ── P1 exchanges a card ──────────────────────────────────────────────────
+  const handleP1Exchange = (cardToDiscard) => {
+    const allIds = p1Cards.map(c => c.id);
+    const newCard = drawOneCard(history.length, allIds);
+    if (newCard) {
+      setP1Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
+    }
+    setGamePhase('pass_to_p2');
+  };
+
+  // ── P2 counter window routing (after pass_to_p2 ready) ───────────────────
+  const routeAfterPass = () => {
+    const unusedCounters = p2Cards.filter(
+      c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
+    );
+    if (unusedCounters.length > 0) {
+      setGamePhase('counter_window_p2');
+    } else {
+      setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
+    }
+  };
+
+  // ── P2 plays counter card ────────────────────────────────────────────────
+  const handleP2CounterPlay = (card) => {
+    setActiveCounterCard(card);
+    const newUsed = [...p2UsedCardIds, card.id];
+    setP2UsedCardIds(newUsed);
+    // Check win before counter screen (unlikely but consistent)
+    const winner = checkWin(newUsed, p2Cards, player2);
+    if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
+    setGamePhase('counter_p2');
+  };
+
+  const handleP2CounterDone = () => {
+    setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
+  };
+
+  // ── P2 finishes arguing ──────────────────────────────────────────────────
+  const handleP2Done = (moveCard, _note, hazardCard) => {
+    setActiveHazard(null); // clear any hazard applied to P2 this turn
+    setCurrentP2Move(moveCard);
+
+    const newUsed = [...p2UsedCardIds];
+    if (moveCard)   newUsed.push(moveCard.id);
+    if (hazardCard) newUsed.push(hazardCard.id);
+    setP2UsedCardIds(newUsed);
+    if (hazardCard) setActiveHazard(hazardCard);
+
+    const winner = checkWin(newUsed, p2Cards, player2);
+    if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
+
+    setGamePhase('round_end');
+  };
+
+  // ── P2 exchanges a card ──────────────────────────────────────────────────
+  const handleP2Exchange = (cardToDiscard) => {
+    const allIds = p2Cards.map(c => c.id);
+    const newCard = drawOneCard(history.length, allIds);
+    if (newCard) {
+      setP2Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
+    }
+    setGamePhase('round_end');
+  };
 
   const handleNextRound = () => {
     setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: currentP2Move }]);
@@ -186,11 +289,7 @@ export default function App() {
     return (
       <SafeAreaView style={S.safe}>
         <ExpoStatusBar style="light" />
-        <HomeScreen
-          dailyDraw={dailyDraw}
-          onPlayDaily={() => {}}
-          canPlay={false}
-        />
+        <HomeScreen dailyDraw={dailyDraw} onPlayDaily={() => {}} canPlay={false} />
       </SafeAreaView>
     );
   }
@@ -208,10 +307,7 @@ export default function App() {
     );
     if (activeTab === 'help') return <HelpScreen />;
     if (activeTab === 'dojo') return (
-      <SoloDojoScreen
-        completedDrills={completedDrills}
-        onComplete={handleDrillComplete}
-      />
+      <SoloDojoScreen completedDrills={completedDrills} onComplete={handleDrillComplete} />
     );
     if (activeTab === 'account') return (
       <AccountScreen
@@ -249,9 +345,9 @@ export default function App() {
             onConfirm={(card, p1, p2) => {
               setSelectedCase(card);
               setPlayer1(p1); setPlayer2(p2);
-              const all4 = dealMoveCards(history.length, 4);
-              setP1Moves(all4.slice(0, 2));
-              setP2Moves(all4.slice(2, 4));
+              const all4 = dealCards(history.length, 4);
+              setP1Cards(all4.slice(0, 2));
+              setP2Cards(all4.slice(2, 4));
               setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
             }}
           />
@@ -261,7 +357,7 @@ export default function App() {
         return (
           <CornerTimeScreen
             player={player1}
-            moves={p1Moves}
+            cards={p1Cards}
             onReady={() => setGamePhase('debate_p1')}
           />
         );
@@ -270,7 +366,7 @@ export default function App() {
         return (
           <CornerTimeScreen
             player={player2}
-            moves={p2Moves}
+            cards={p2Cards}
             onReady={() => setGamePhase('debate_p2')}
           />
         );
@@ -282,14 +378,40 @@ export default function App() {
             caseCard={selectedCase}
             player={player1}
             nextPlayerName={player2?.name}
-            moves={p1Moves}
+            cards={p1Cards}
+            activeHazard={activeHazard}
             debateSecs={debateSecs}
             onDone={handleP1Done}
+            onExchange={handleP1Exchange}
           />
         );
 
       case 'pass_to_p2':
-        return <PassScreen name={player2?.name} onReady={() => setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2')} />;
+        return <PassScreen name={player2?.name} onReady={routeAfterPass} />;
+
+      case 'counter_window_p2': {
+        const unusedCounters = p2Cards.filter(
+          c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
+        );
+        return (
+          <CounterWindowScreen
+            player={player2}
+            counterCards={unusedCounters}
+            onPlay={handleP2CounterPlay}
+            onSkip={() => setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2')}
+          />
+        );
+      }
+
+      case 'counter_p2':
+        return (
+          <CounterScreen
+            player={player2}
+            caseCard={selectedCase}
+            counterCard={activeCounterCard}
+            onDone={handleP2CounterDone}
+          />
+        );
 
       case 'debate_p2':
         return (
@@ -298,9 +420,19 @@ export default function App() {
             caseCard={selectedCase}
             player={player2}
             nextPlayerName={null}
-            moves={p2Moves}
+            cards={p2Cards}
+            activeHazard={activeHazard}
             debateSecs={debateSecs}
             onDone={handleP2Done}
+            onExchange={handleP2Exchange}
+          />
+        );
+
+      case 'player_wins':
+        return (
+          <PlayerWinsScreen
+            winner={winningPlayer}
+            onContinue={handleEndGame}
           />
         );
 

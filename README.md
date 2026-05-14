@@ -23,7 +23,7 @@ The app treats players as **junior debaters, not students** — members of the *
 | Action | Points |
 |---|---|
 | Won the argument | +1 pt |
-| Slipped in a move card | +1 bonus pt |
+| Used a move card | +1 bonus pt |
 
 Maximum 2 points per player per round.
 
@@ -43,10 +43,14 @@ Full custom game. Browse and pick a case + players in one screen, each player ge
 - P1 and P2 always receive different cards (dealt like poker/UNO — no sharing)
 
 ### 🦊 Solo Dojo (bottom nav)
-Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill move cards alone through a 2-step interactive challenge per card:
+Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill move cards alone through a 5-step interactive arc:
 
-1. **Spot the flaw** — Argus presents a bad argument; player picks the correct critique (multiple choice)
-2. **Build the counter** — player completes a counter-argument using the move technique (fill in the blank)
+1. **Understand** (Steps 1–2) — Info cards + comprehension questions teach the concept and the feeling behind the move
+2. **See it** (Step 3) — Argus shows the move in real argument examples with guided questions
+3. **Build it** (Step 4) — Player assembles a complete response using the move
+4. **Say it** (Step 5) — Model response on screen; 15s countdown to say it out loud
+
+Bronze cards use this full 5-step arc. Silver and Gold cards use a shorter legacy format.
 
 **Tier gating:** BRONZE drills are available immediately. SILVER unlocks when all 8 BRONZE are completed. GOLD unlocks when both SILVER are completed. All drills are replayable.
 
@@ -107,8 +111,11 @@ First launch → Account tab (add 2 players) → game launches automatically
 Daily Quick Draw →
   1. Tap "▶ Play Today's Round"
   2. Choose 2 players (PlayerPickScreen)
-  3. [Corner Time — 60s to plan, if enabled]
-  4. DEBATE — progress bar depletes; P1 debates with their move card
+  3. [Corner Time — "Prepare your case, [Name]" shown; 60s to plan, if enabled]
+  4. DEBATE — "State your case, [Name]"; progress bar depletes; P1 debates
+     - Jot notes (text tab) or record yourself (voice tab, requires expo-av)
+     - Tap a move card to mark it as used (+1 bonus)
+     - "Done — I'm Finished" ends the turn early (auto-saves notes if time lapses)
   5. Pass phone to P2 (privacy cover screen)
   6. [Corner Time — 60s for P2, if enabled]
   7. P2 debates with their move card
@@ -121,11 +128,12 @@ Daily Quick Draw →
   2. Select Player 1 and Player 2 from inline dropdowns
      (Player 1 speaks first, then Player 2)
   3. Tap "Choose This Case" — each player is dealt their own 2 unique move cards
-  4. [Corner Time — 60s for P1 to plan, if enabled]
-  5. DEBATE — progress bar depletes as time runs out
+  4. [Corner Time — "Prepare your case, [Name]"; 60s for P1, if enabled]
+  5. DEBATE — "State your case, [Name]"; progress bar depletes as time runs out
      - Case description always visible
-     - Your move cards shown — tap one to mark it as used (+1 bonus if correct)
-     - "Done — I'm Finished" ends the turn early
+     - Jot notes (text tab) or record yourself (voice tab, requires expo-av)
+     - Your move cards shown — tap one to mark it as used (+1 bonus if you use a move card)
+     - "Done — I'm Finished" ends the turn early (text notes auto-saved if time lapses)
   6. Pass phone to P2 (privacy cover screen)
   7. [Corner Time — 60s for P2, if enabled]
   8. P2 debates with their own different move cards
@@ -134,9 +142,8 @@ Daily Quick Draw →
 
 🦊  Solo Dojo →
   1. Pick any unlocked move card from the list
-  2. Step 1 — Argus presents a bad argument; spot the flaw (A / B / C)
-  3. Step 2 — Complete the counter-argument using the move
-  4. Drill marked complete; replay anytime
+  2. Steps 1–5 — Info cards, comprehension questions, examples, full response build, 15s deliver
+  3. Drill marked complete; replay anytime
 ```
 
 ---
@@ -149,7 +156,9 @@ Daily Quick Draw →
 | Debate Time | 5 min | Player turn duration (1–15 min) |
 | Corner Time | ON | 60s planning window before each debate turn |
 
-**Corner Time** shows a depleting teal bar, the player's name chip, and their move cards — giving kids time to plan their argument before the debate clock starts. Players can tap "I'm Ready" to skip early.
+**Corner Time** shows a depleting teal bar, a big personalised heading ("Prepare your case, [Name]"), and the player's move cards — giving kids time to plan their argument before the debate clock starts. Players can tap "I'm Ready" to skip early.
+
+**Voice Recording** requires `expo-av` to be installed (`npx expo install expo-av`). If not installed, the voice tab shows install instructions and the app continues to work normally with text notes only.
 
 ---
 
@@ -199,7 +208,8 @@ The game speaks like a sparring partner, not a teacher.
 | Language | **JavaScript / React 19** | Fast iteration; no compile step |
 | Navigation | **Custom state machine** (`gamePhase`) | No dependency overhead for a linear flow |
 | Animation | **React Native `Animated` API** | Built-in; powers card slide transitions and random spin |
-| Persistence | **AsyncStorage** | Players, settings, and completed drills survive app restarts |
+| Persistence | **AsyncStorage** | Players, settings, completed drills, and game history survive app restarts |
+| Voice (optional) | **expo-av** | Microphone recording during debate turns; gracefully absent if not installed |
 | Styling | **StyleSheet** | Native performance; no third-party UI lib |
 | Safe area | **react-native-safe-area-context** | Correct notch/Dynamic Island handling on iOS |
 | Build/Deploy | **EAS Build + TestFlight** | Cloud iOS builds without a Mac CI server |
@@ -210,7 +220,7 @@ The game speaks like a sparring partner, not a teacher.
 App.js          ← state machine + AsyncStorage (players, settings, completedDrills)
 cards.js        ← MOVE_CARDS + CASE_CARDS (content: what, hint, status fields)
 data.js         ← constants, utilities, getDailyDraw(), dealMoveCards(); re-exports cards
-drills.js       ← 2-step drill content for all 12 move cards (Argus Solo Dojo)
+drills.js       ← DRILLS (5-step Bronze) + DRILLS_LEGACY (2-step Silver/Gold) for Solo Dojo
 styles.js       ← design tokens (C) + StyleSheet (S) — Ink & Spark palette
 components.js   ← Btn, CardBrowser, MovePickRow, BottomNav, card views
 screens.js      ← all screens (Home, Help, Account, PlayerPick, CasePick, CornerTime,
@@ -251,6 +261,6 @@ eas submit --platform ios
 
 ## Roadmap
 
-- **V1 (current)** — local pass-and-play, daily quick draw, inline case/player picker, Corner Time, depleting progress bar, configurable debate time, each player's own move cards, multi-round, scoring, player roster, history, Solo Dojo with Argus, AsyncStorage persistence, Ink & Spark design direction
-- **V2** — daily streak counter, audio recording + transcription (Apple Speech framework), LLM judge (Gemini Flash), structured verdict (winner + witty breakdown + feedback)
+- **V1 (current)** — local pass-and-play, daily quick draw, inline case/player picker, Corner Time (personalised headings), text/voice notes during debate, depleting progress bar, configurable debate time, each player's own move cards, multi-round, scoring, Win/Loss/Draw history (Home + Account), Solo Dojo with Argus (5-step Bronze drills), AsyncStorage persistence, Ink & Spark design direction
+- **V2** — daily streak counter, audio transcription (Apple Speech framework), LLM judge (Gemini Flash), structured verdict (winner + witty breakdown + feedback)
 - **V3** — player accounts, match history, remote multiplayer, card deck OTA updates via Firebase/Supabase

@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, ScrollView, Animated, Dimensions,
   TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CARD_W, DEFAULT_DEBATE_SECS, MOVE_CARDS, sortedCases, formatTime, timerColor } from './data';
 import { DRILLS, DRILLS_LEGACY } from './drills';
 import { C, S } from './styles';
@@ -189,6 +190,49 @@ export const HelpScreen = () => (
         <Text style={{ color: '#68D391' }}>+1 bonus point</Text> if you actually used your move card.
       </Text>
     </View>
+
+    <View style={S.helpDivider} />
+    <Text style={[S.screenTitle, { marginTop: 8 }]}>SOLO DOJO</Text>
+    <Text style={S.helpBody}>
+      The Solo Dojo is where you train alone with{' '}
+      <Text style={{ color: C.gold, fontStyle: 'italic' }}>Argus</Text>{' '}
+      — the fox barrister. Pick any unlocked move card from the list, and Argus walks you through it in five steps.
+    </Text>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>1</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Understand</Text> — Argus explains the move and why it works, with examples drawn from history's sharpest minds.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>2</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Feel it</Text> — You explore the emotion behind the move: why it matters, what it does to the person hearing it.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>3</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>See it</Text> — Argus shows the move in a real argument. You identify what makes it work.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>4</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Build it</Text> — You construct a full response using the move technique, step by step.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>5</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Say it</Text> — A model response appears on screen. You have 15 seconds to say it out loud. Say it like you mean it.
+      </Text>
+    </View>
+    <Text style={S.helpBody}>
+      <Text style={{ color: C.teal }}>BRONZE</Text> cards are always available.{' '}
+      <Text style={{ color: '#C0C0C0' }}>SILVER</Text> unlocks when all 8 Bronze are mastered.{' '}
+      <Text style={{ color: '#ECC94B' }}>GOLD</Text> unlocks when both Silver are done. All drills can be replayed anytime.
+    </Text>
 
     <View style={S.helpDivider} />
     <Text style={[S.screenTitle, { marginTop: 8 }]}>QUICK DRAW</Text>
@@ -618,7 +662,9 @@ export const PassScreen = ({ name, onReady }) => (
 // Gives players a moment to read their move cards and plan their argument.
 // Auto-advances when the 60s countdown expires; player can also skip early.
 
-export const CornerTimeScreen = ({ player, moves, onReady }) => {
+export const CornerTimeScreen = ({ player, cards = [], moves, onReady }) => {
+  // `cards` is the new unified prop; `moves` kept for backward-compat (daily flow)
+  const allCards = cards.length > 0 ? cards : (moves || []);
   const [secondsLeft, setSecondsLeft] = useState(60);
   const intervalRef = useRef(null);
   const calledReady = useRef(false);
@@ -662,10 +708,10 @@ export const CornerTimeScreen = ({ player, moves, onReady }) => {
           style={{ width: CARD_W * 0.44, height: CARD_W * 0.44, resizeMode: 'contain', alignSelf: 'center', marginBottom: 16 }}
         />
 
-        {moves.length > 0 ? (
+        {allCards.length > 0 ? (
           <>
-            <Text style={[S.screenLabel, { marginBottom: 12 }]}>YOUR MOVE CARDS</Text>
-            {moves.map(card => <MoveCardView key={card.id} card={card} />)}
+            <Text style={[S.screenLabel, { marginBottom: 12 }]}>YOUR CARDS</Text>
+            {allCards.map(card => <MoveCardView key={card.id} card={card} />)}
           </>
         ) : null}
 
@@ -680,20 +726,39 @@ export const CornerTimeScreen = ({ player, moves, onReady }) => {
 };
 
 // ── Debate: depleting progress bar + dealt move card picker ───────────────
-// moves: Card[] — each player's own 2 dealt cards (or 1 for daily mode)
+// cards: Card[] — each player's own 2 dealt cards (move / hazard / counter mix)
+// activeHazard: Card | null — hazard played by opponent; restricts this player's turn
 // debateSecs: total seconds for this player's turn (configurable from Account)
-// onDone(selectedMove | null, noteText) hands control back to the parent.
+// onDone(moveCard, noteText, hazardCard) — move and hazard used this turn
+// onExchange(card) — player exchanges a card instead of playing one
 
-export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSecs = DEFAULT_DEBATE_SECS, onDone }) => {
-  const [secondsLeft, setSecondsLeft] = useState(debateSecs);
-  const [selectedMove, setSelectedMove] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [noteText, setNoteText] = useState('');
-  const [inputMode, setInputMode] = useState('text'); // 'text' | 'voice'
+export const DebateScreen = ({
+  caseCard, player, nextPlayerName,
+  cards = [], activeHazard = null,
+  debateSecs = DEFAULT_DEBATE_SECS,
+  onDone, onExchange,
+}) => {
+  // Honour "30 SECONDS" hazard by capping the clock
+  const effectiveSecs = activeHazard?.restrictDebateSecs
+    ? Math.min(activeHazard.restrictDebateSecs, debateSecs)
+    : debateSecs;
+
+  const moveCards    = cards.filter(c => c.cardType === 'move');
+  const hazardCards  = cards.filter(c => c.cardType === 'hazard');
+  // counter cards are used in the CounterWindow, not shown here
+
+  const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
+  const [selectedMove,   setSelectedMove]   = useState(null);
+  const [selectedHazard, setSelectedHazard] = useState(null);
+  const [showModal,      setShowModal]      = useState(false);
+  const [showExchange,   setShowExchange]   = useState(false);
+  const [exchangeCard,   setExchangeCard]   = useState(null);
+  const [noteText,  setNoteText]   = useState('');
+  const [inputMode, setInputMode]  = useState('text');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingObj, setRecordingObj] = useState(null);
   const [recordingUri, setRecordingUri] = useState(null);
-  const intervalRef = useRef(null);
+  const intervalRef  = useRef(null);
   const savedNoteRef = useRef('');
 
   useEffect(() => { savedNoteRef.current = noteText; }, [noteText]);
@@ -702,11 +767,7 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
     if (showModal) return;
     intervalRef.current = setInterval(() => {
       setSecondsLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(intervalRef.current);
-          setShowModal(true);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(intervalRef.current); setShowModal(true); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -718,9 +779,7 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
     try {
       await Audio.requestPermissionsAsync();
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       setRecordingObj(recording);
       setIsRecording(true);
     } catch (_) {}
@@ -730,26 +789,20 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
     if (!recordingObj) return;
     try {
       await recordingObj.stopAndUnloadAsync();
-      const uri = recordingObj.getURI();
-      setRecordingUri(uri);
+      setRecordingUri(recordingObj.getURI());
     } catch (_) {}
     setRecordingObj(null);
     setIsRecording(false);
   };
 
   const tColor = timerColor(secondsLeft);
-  const toggleMove = card =>
-    setSelectedMove(prev => (prev?.id === card.id ? null : card));
+  const toggleMove   = c => setSelectedMove(prev   => (prev?.id === c.id ? null : c));
+  const toggleHazard = c => setSelectedHazard(prev => (prev?.id === c.id ? null : c));
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {/* Depleting progress bar — starts full, empties as time runs out */}
-      <View style={{ height: 5, backgroundColor: C.border, width: '100%' }}>
-        <View style={{
-          width: debateSecs > 0 ? `${Math.round(secondsLeft / debateSecs * 100)}%` : '0%',
-          height: 5,
-          backgroundColor: tColor,
-        }} />
+      <View style={{ height: 5, backgroundColor: C.border }}>
+        <View style={{ width: effectiveSecs > 0 ? `${Math.round(secondsLeft / effectiveSecs * 100)}%` : '0%', height: 5, backgroundColor: tColor }} />
       </View>
       <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface }}>
         <View style={[S.playerChip, { backgroundColor: C.teal }]}>
@@ -762,6 +815,15 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
           State your case,{'\n'}{player.name}
         </Text>
 
+        {/* Active hazard restriction banner */}
+        {activeHazard ? (
+          <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 14 }}>
+            <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
+            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
+            <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
+          </View>
+        ) : null}
+
         <CaseBanner card={caseCard} />
 
         <View style={S.scoringHint}>
@@ -770,20 +832,14 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
           </Text>
         </View>
 
-        {/* Note input — text or voice */}
+        {/* Notes / voice */}
         <View style={{ marginTop: 20 }}>
           <View style={{ flexDirection: 'row', marginBottom: 10 }}>
             {['text', 'voice'].map(mode => (
               <TouchableOpacity
                 key={mode}
                 onPress={() => setInputMode(mode)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 8,
-                  alignItems: 'center',
-                  borderBottomWidth: 2,
-                  borderBottomColor: inputMode === mode ? C.teal : C.border,
-                }}
+                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: inputMode === mode ? C.teal : C.border }}
               >
                 <Text style={{ color: inputMode === mode ? C.teal : C.muted, fontWeight: '700', fontSize: 12, letterSpacing: 1 }}>
                   {mode === 'text' ? '✏️  NOTES' : '🎙  VOICE'}
@@ -794,18 +850,7 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
 
           {inputMode === 'text' ? (
             <TextInput
-              style={{
-                backgroundColor: C.surface,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: C.border,
-                color: '#E8E0D0',
-                fontSize: 15,
-                lineHeight: 22,
-                padding: 14,
-                minHeight: 100,
-                textAlignVertical: 'top',
-              }}
+              style={{ backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, color: '#E8E0D0', fontSize: 15, lineHeight: 22, padding: 14, minHeight: 100, textAlignVertical: 'top' }}
               placeholder="Jot down your argument…"
               placeholderTextColor={C.muted}
               multiline
@@ -818,22 +863,14 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
                 <>
                   <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FC8181', marginBottom: 10 }} />
                   <Text style={{ color: '#FC8181', fontWeight: '700', fontSize: 12, letterSpacing: 1, marginBottom: 16 }}>RECORDING…</Text>
-                  <TouchableOpacity
-                    onPress={stopRecording}
-                    style={{ backgroundColor: '#FC8181', borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}
-                  >
+                  <TouchableOpacity onPress={stopRecording} style={{ backgroundColor: '#FC8181', borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}>
                     <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>⏹  STOP</Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
-                  {recordingUri ? (
-                    <Text style={{ color: C.teal, fontSize: 12, marginBottom: 12, letterSpacing: 0.5 }}>Recording saved ✓</Text>
-                  ) : null}
-                  <TouchableOpacity
-                    onPress={startRecording}
-                    style={{ backgroundColor: C.teal, borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}
-                  >
+                  {recordingUri ? <Text style={{ color: C.teal, fontSize: 12, marginBottom: 12 }}>Recording saved ✓</Text> : null}
+                  <TouchableOpacity onPress={startRecording} style={{ backgroundColor: C.teal, borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}>
                     <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>🎙  START RECORDING</Text>
                   </TouchableOpacity>
                 </>
@@ -842,20 +879,20 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
           ) : (
             <View style={{ backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 16, alignItems: 'center' }}>
               <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-                Voice recording requires{'\n'}
-                <Text style={{ color: C.gold, fontWeight: '700' }}>expo-av</Text>
-                {' '}to be installed.{'\n\n'}Run:{' '}
-                <Text style={{ color: C.teal, fontWeight: '700' }}>npx expo install expo-av</Text>
+                Voice recording requires{' '}<Text style={{ color: C.gold, fontWeight: '700' }}>expo-av</Text>
+                {'\n\n'}Run: <Text style={{ color: C.teal, fontWeight: '700' }}>npx expo install expo-av</Text>
               </Text>
             </View>
           )}
         </View>
 
-        {moves.length > 0 ? (
+        {/* Move cards */}
+        {moveCards.length > 0 ? (
           <>
-            {moves.map(card => {
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>YOUR MOVE CARDS</Text>
+            {moveCards.map(card => {
               const selected = selectedMove?.id === card.id;
-              const dimmed = selectedMove !== null && !selected;
+              const dimmed   = selectedMove !== null && !selected;
               return (
                 <TouchableOpacity
                   key={card.id}
@@ -863,26 +900,14 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
                   activeOpacity={0.88}
                   style={[
                     { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
-                    selected && {
-                      borderColor: card.accent,
-                      shadowColor: card.accent,
-                      shadowOpacity: 0.5,
-                      shadowRadius: 14,
-                      shadowOffset: { width: 0, height: 4 },
-                    },
+                    selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
                     dimmed && { opacity: 0.4 },
                   ]}
                 >
                   <MoveCardView card={card} />
                   {selected ? (
-                    <View style={{
-                      position: 'absolute', top: 14, right: 14,
-                      backgroundColor: card.accent, borderRadius: 14,
-                      paddingHorizontal: 12, paddingVertical: 5,
-                    }}>
-                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
-                        ✓ USING
-                      </Text>
+                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ USING</Text>
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -891,34 +916,258 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
           </>
         ) : null}
 
-        <Btn
-          label="✓  DONE — I'M FINISHED"
-          onPress={() => setShowModal(true)}
-          style={{ marginTop: 20, marginBottom: 40 }}
-        />
+        {/* Hazard cards — play at end of argument */}
+        {hazardCards.length > 0 ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>YOUR HAZARD CARDS</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 10, letterSpacing: 0.3 }}>Play one at the end of your argument to restrict your opponent's next turn.</Text>
+            {hazardCards.map(card => {
+              const selected = selectedHazard?.id === card.id;
+              const dimmed   = selectedHazard !== null && !selected;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  onPress={() => toggleHazard(card)}
+                  activeOpacity={0.88}
+                  style={[
+                    { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                    selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+                    dimmed && { opacity: 0.4 },
+                  ]}
+                >
+                  <MoveCardView card={card} />
+                  {selected ? (
+                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        ) : null}
+
+        <Btn label="✓  DONE — I'M FINISHED" onPress={() => setShowModal(true)} style={{ marginTop: 20 }} />
+
+        {/* Card exchange option */}
+        {cards.length > 0 ? (
+          <TouchableOpacity onPress={() => setShowExchange(true)} style={{ paddingVertical: 16, alignItems: 'center' }}>
+            <Text style={{ color: C.muted, fontSize: 13, letterSpacing: 0.3 }}>↺  Exchange a card instead of playing one</Text>
+          </TouchableOpacity>
+        ) : <View style={{ height: 40 }} />}
       </ScrollView>
 
+      {/* Done confirmation modal */}
       {showModal ? (
         <View style={S.modalOverlay}>
           <View style={S.modalBox}>
-            <Text style={S.modalTitle}>
-              {secondsLeft === 0 ? "⏱  TIME'S UP!" : '✓  DONE!'}
-            </Text>
+            <Text style={S.modalTitle}>{secondsLeft === 0 ? "⏱  TIME'S UP!" : '✓  DONE!'}</Text>
             <Text style={S.modalBody}>
               {nextPlayerName
                 ? `Your argument is on record.\nThe floor passes to ${nextPlayerName}.`
                 : `${player.name} has spoken.\nThe Parlour awaits your verdict.`}
             </Text>
+            {selectedHazard ? (
+              <View style={{ backgroundColor: '#2A1000', borderRadius: 10, borderWidth: 1, borderColor: selectedHazard.accent, padding: 10, marginBottom: 14 }}>
+                <Text style={{ color: selectedHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2 }}>⚡ HAZARD PLAYED</Text>
+                <Text style={{ color: '#E8DFC8', fontWeight: '700', marginTop: 2 }}>{selectedHazard.name}</Text>
+              </View>
+            ) : null}
             <Btn
               label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
-              onPress={() => onDone(selectedMove, savedNoteRef.current)}
+              onPress={() => onDone(selectedMove, savedNoteRef.current, selectedHazard)}
             />
+          </View>
+        </View>
+      ) : null}
+
+      {/* Exchange card modal */}
+      {showExchange ? (
+        <View style={S.modalOverlay}>
+          <View style={[S.modalBox, { maxHeight: '80%' }]}>
+            <Text style={S.modalTitle}>↺  EXCHANGE A CARD</Text>
+            <Text style={[S.modalBody, { marginBottom: 14 }]}>
+              Choose a card to discard — a new one will be drawn. Your argument turn ends.
+            </Text>
+            <ScrollView>
+              {cards.filter(c => c.cardType !== 'counter').map(c => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => setExchangeCard(c)}
+                  style={[
+                    { borderRadius: 12, borderWidth: 2, borderColor: exchangeCard?.id === c.id ? c.accent : C.border, padding: 12, marginBottom: 8, backgroundColor: C.surface },
+                  ]}
+                >
+                  <Text style={{ color: exchangeCard?.id === c.id ? c.accent : '#E8DFC8', fontWeight: '800' }}>{c.icon}  {c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Btn
+              label="CONFIRM EXCHANGE"
+              onPress={() => { if (exchangeCard) { setShowExchange(false); onExchange(exchangeCard); } }}
+              style={{ marginTop: 12 }}
+            />
+            <TouchableOpacity onPress={() => { setShowExchange(false); setExchangeCard(null); }} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: C.muted, fontSize: 14, fontWeight: '700', textAlign: 'center' }}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : null}
     </View>
   );
 };
+
+// ── Counter Window: 10s interrupt after opponent finishes arguing ─────────
+// counterCards: Card[] — only the counter cards P2 hasn't used yet
+// onPlay(card)  — P2 chose to play a counter card
+// onSkip()      — P2 skipped the counter window
+
+export const CounterWindowScreen = ({ player, counterCards, onPlay, onSkip }) => {
+  const [secsLeft, setSecsLeft]   = useState(10);
+  const [selected, setSelected]   = useState(null);
+  const calledRef = useRef(false);
+  const intervalRef = useRef(null);
+
+  const doSkip = () => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    clearInterval(intervalRef.current);
+    onSkip();
+  };
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSecsLeft(s => {
+        if (s <= 1) { clearInterval(intervalRef.current); doSkip(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ height: 4, backgroundColor: C.border }}>
+        <View style={{ width: `${(secsLeft / 10) * 100}%`, height: 4, backgroundColor: '#A78BFA' }} />
+      </View>
+
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 48, paddingBottom: 48 }]}>
+        <Text style={{ color: '#A78BFA', fontWeight: '900', fontSize: 11, letterSpacing: 2, textAlign: 'center', marginBottom: 8 }}>
+          COUNTER WINDOW  ·  {secsLeft}s
+        </Text>
+        <Text style={{ fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 36, marginBottom: 6 }}>
+          Heard something{'\n'}worth countering?
+        </Text>
+        <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', marginBottom: 28 }}>
+          {player.name} — choose a counter card to interrupt, or skip straight to your argument.
+        </Text>
+
+        {counterCards.map(card => (
+          <TouchableOpacity
+            key={card.id}
+            onPress={() => setSelected(card)}
+            style={[
+              { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+              selected?.id === card.id && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+            ]}
+          >
+            <MoveCardView card={card} />
+            {selected?.id === card.id ? (
+              <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ SELECTED</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+        ))}
+
+        <Btn
+          label="🗡  PLAY COUNTER CARD!"
+          onPress={() => {
+            if (!selected) return;
+            clearInterval(intervalRef.current);
+            calledRef.current = true;
+            onPlay(selected);
+          }}
+          style={{ marginTop: 20, opacity: selected ? 1 : 0.4 }}
+        />
+        <Btn label="Skip — make my argument" variant="secondary" onPress={doSkip} />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Counter: 30-second focused rebuttal ──────────────────────────────────
+// counterCard: the card being played
+// onDone()    — counter argument delivered
+
+export const CounterScreen = ({ player, caseCard, counterCard, onDone }) => {
+  const [secsLeft, setSecsLeft] = useState(30);
+  const calledRef   = useRef(false);
+  const intervalRef = useRef(null);
+
+  const finish = () => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    clearInterval(intervalRef.current);
+    onDone();
+  };
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSecsLeft(s => {
+        if (s <= 1) { clearInterval(intervalRef.current); finish(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  const tColor = timerColor(secsLeft);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ height: 5, backgroundColor: C.border }}>
+        <View style={{ width: `${(secsLeft / 30) * 100}%`, height: 5, backgroundColor: tColor }} />
+      </View>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: C.surface }}>
+        <View style={[S.playerChip, { backgroundColor: '#A78BFA' }]}>
+          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}  ·  COUNTER</Text>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 32, paddingBottom: 48 }]}>
+        <Text style={{ color: '#A78BFA', fontWeight: '900', fontSize: 11, letterSpacing: 2, textAlign: 'center', marginBottom: 6 }}>
+          🗡  {counterCard.name}  ·  {secsLeft}s
+        </Text>
+        <Text style={{ fontSize: 24, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 34, marginBottom: 20 }}>
+          Counter one point{'\n'}they just made.
+        </Text>
+
+        <View style={{ backgroundColor: '#0D0029', borderRadius: 14, borderWidth: 1, borderColor: counterCard.accent, padding: 16, marginBottom: 20 }}>
+          <Text style={{ color: counterCard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 6 }}>YOUR COUNTER</Text>
+          <Text style={{ color: '#E8DFC8', fontSize: 14, fontWeight: '600', lineHeight: 22 }}>{counterCard.hint}</Text>
+        </View>
+
+        <CaseBanner card={caseCard} />
+
+        <Btn label="✓  COUNTER DELIVERED" onPress={finish} style={{ marginTop: 24 }} />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Player wins: all cards used ───────────────────────────────────────────
+
+export const PlayerWinsScreen = ({ winner, onContinue }) => (
+  <View style={[S.screen, { justifyContent: 'center', paddingHorizontal: 32 }]}>
+    <Text style={[S.screenLabel, { marginBottom: 8 }]}>ALL CARDS PLAYED!</Text>
+    <Text style={S.heroTitle}>{winner.name}{'\n'}PLAYED{'\n'}THEM ALL.</Text>
+    <Text style={[S.hint, { marginTop: 16 }]}>
+      {winner.name} used every card in their hand.{'\n'}The Parlour demands a verdict.
+    </Text>
+    <Btn label="🏆  SCORE THE GAME" onPress={onContinue} style={{ marginTop: 40 }} />
+  </View>
+);
 
 // ── Round end: next round or score the game ────────────────────────────────
 
@@ -1056,16 +1305,25 @@ const ARGUS_IMAGES = {
   dramatic:    require('./argus_dramatic.png'),
 };
 
+const DRILL_PROGRESS_KEY = 'drillProgress';
+
 const DrillRunner = ({ drill, card, onComplete, onBack }) => {
   const [stepIdx, setStepIdx]       = useState(0);
   const [screenIdx, setScreenIdx]   = useState(0);
-  const [phase, setPhase]           = useState('viewing'); // 'viewing' | 'answered'
+  const [phase, setPhase]           = useState('viewing');
   const [selectedIdx, setSelectedIdx] = useState(null);
   const [wasCorrect, setWasCorrect] = useState(false);
   const [saidIt, setSaidIt]         = useState(false);
   const [secsLeft, setSecsLeft]     = useState(15);
   const [showLeave, setShowLeave]   = useState(false);
-  const timerRef = useRef(null);
+  const [showRestart, setShowRestart] = useState(false);
+  // Typewriter state — only active on the very first screen of the drill
+  const [twHeading, setTwHeading]   = useState('');
+  const [twBody, setTwBody]         = useState('');
+  const [twDone, setTwDone]         = useState(false);
+  const timerRef  = useRef(null);
+  const twRef     = useRef(null);
+  const progressLoadedRef = useRef(false);
 
   const currentStep   = drill.steps[stepIdx];
   const currentScreen = currentStep.screens[screenIdx];
@@ -1074,6 +1332,68 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
   const doneScreens  = drill.steps.slice(0, stepIdx).reduce((n, s) => n + s.screens.length, 0) + screenIdx;
   const progress     = doneScreens / totalScreens;
 
+  // ── Load saved progress on mount ────────────────────────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem(DRILL_PROGRESS_KEY).then(raw => {
+      if (!raw) { progressLoadedRef.current = true; return; }
+      try {
+        const saved = JSON.parse(raw);
+        const pos = saved[card.id];
+        if (pos) {
+          setStepIdx(pos.stepIdx);
+          setScreenIdx(pos.screenIdx);
+        }
+      } catch (_) {}
+      progressLoadedRef.current = true;
+    });
+  }, []);
+
+  // ── Save progress whenever position changes ──────────────────────────────
+  useEffect(() => {
+    if (!progressLoadedRef.current) return;
+    AsyncStorage.getItem(DRILL_PROGRESS_KEY).then(raw => {
+      const all = raw ? JSON.parse(raw) : {};
+      all[card.id] = { stepIdx, screenIdx };
+      AsyncStorage.setItem(DRILL_PROGRESS_KEY, JSON.stringify(all));
+    }).catch(() => {});
+  }, [stepIdx, screenIdx]);
+
+  // ── Typewriter: only on the very first info screen (step 0, screen 0) ────
+  useEffect(() => {
+    clearInterval(twRef.current);
+    const isFirst = stepIdx === 0 && screenIdx === 0 && currentScreen.type === 'info';
+    if (!isFirst) { setTwDone(true); return; }
+
+    const heading = currentScreen.heading || '';
+    const body    = currentScreen.body    || '';
+    const total   = heading.length + body.length;
+    setTwHeading('');
+    setTwBody('');
+    setTwDone(false);
+
+    let i = 0;
+    twRef.current = setInterval(() => {
+      i++;
+      if (i <= heading.length) {
+        setTwHeading(heading.slice(0, i));
+      } else {
+        setTwBody(body.slice(0, i - heading.length));
+      }
+      if (i >= total) { clearInterval(twRef.current); setTwDone(true); }
+    }, 35);
+    return () => clearInterval(twRef.current);
+  }, [stepIdx, screenIdx]);
+
+  // Tap anywhere on typewriter text to skip to full text immediately
+  const skipTypewriter = () => {
+    if (twDone) return;
+    clearInterval(twRef.current);
+    setTwHeading(currentScreen.heading || '');
+    setTwBody(currentScreen.body || '');
+    setTwDone(true);
+  };
+
+  // ── Deliver countdown timer ───────────────────────────────────────────────
   useEffect(() => {
     if (currentScreen.type !== 'deliver') return;
     const secs = currentScreen.timerSecs || 15;
@@ -1097,6 +1417,21 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
     setWasCorrect(false);
   };
 
+  const doRestart = async () => {
+    // Clear saved position for this card
+    try {
+      const raw = await AsyncStorage.getItem(DRILL_PROGRESS_KEY);
+      if (raw) {
+        const all = JSON.parse(raw);
+        delete all[card.id];
+        await AsyncStorage.setItem(DRILL_PROGRESS_KEY, JSON.stringify(all));
+      }
+    } catch (_) {}
+    setStepIdx(0); setScreenIdx(0);
+    setPhase('viewing'); setSelectedIdx(null); setWasCorrect(false);
+    setSaidIt(false); setShowRestart(false); setShowLeave(false);
+  };
+
   const argusImg = () => {
     const base = currentScreen.argusExpression || 'thinking';
     if (currentScreen.type === 'question' && phase === 'answered') {
@@ -1106,6 +1441,7 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
   };
 
   const letters = ['A', 'B', 'C'];
+  const isFirstScreen = stepIdx === 0 && screenIdx === 0 && currentScreen.type === 'info';
 
   if (currentScreen.type === 'completion') {
     return (
@@ -1127,12 +1463,14 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 48 }]}>
 
-        <TouchableOpacity
-          onPress={() => setShowLeave(true)}
-          style={{ alignSelf: 'flex-start', marginBottom: 12, padding: 4 }}
-        >
-          <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700', letterSpacing: 1 }}>← DOJO</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <TouchableOpacity onPress={() => setShowLeave(true)} style={{ padding: 4 }}>
+            <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700', letterSpacing: 1 }}>← DOJO</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowRestart(true)} style={{ padding: 4 }}>
+            <Text style={{ color: C.muted, fontSize: 12, fontWeight: '700', letterSpacing: 1 }}>↺ RESTART</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={S.drillProgressBar}>
           <View style={[S.drillProgressFill, { width: `${progress * 100}%` }]} />
@@ -1154,18 +1492,30 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
                 <Text style={S.drillQuoteTxt}>"{currentScreen.quote}"</Text>
               </View>
             ) : null}
-            {currentScreen.heading ? (
-              <Text style={S.drillInfoHeading}>{currentScreen.heading}</Text>
-            ) : null}
-            {currentScreen.body ? (
-              <Text style={S.drillInfoBody}>{currentScreen.body}</Text>
-            ) : null}
+            {isFirstScreen ? (
+              // Typewriter rendering on first screen — tap to skip
+              <TouchableOpacity activeOpacity={1} onPress={skipTypewriter}>
+                {twHeading.length > 0 ? (
+                  <Text style={[S.drillInfoHeading, { minHeight: 30 }]}>{twHeading}</Text>
+                ) : null}
+                {twBody.length > 0 ? (
+                  <Text style={S.drillInfoBody}>{twBody}</Text>
+                ) : null}
+              </TouchableOpacity>
+            ) : (
+              <>
+                {currentScreen.heading ? <Text style={S.drillInfoHeading}>{currentScreen.heading}</Text> : null}
+                {currentScreen.body    ? <Text style={S.drillInfoBody}>{currentScreen.body}</Text>       : null}
+              </>
+            )}
             {currentScreen.note ? (
               <View style={S.drillArgusNote}>
                 <Text style={S.drillArgusNoteTxt}>{currentScreen.note}</Text>
               </View>
             ) : null}
-            <Btn label={currentScreen.cta || 'Continue  →'} onPress={advance} style={{ marginTop: 20 }} />
+            {(!isFirstScreen || twDone) ? (
+              <Btn label={currentScreen.cta || 'Continue  →'} onPress={advance} style={{ marginTop: 20 }} />
+            ) : null}
           </>
         )}
 
@@ -1260,10 +1610,23 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
         <View style={S.backConfirmOverlay}>
           <View style={S.backConfirmBox}>
             <Text style={[S.screenTitle, { marginBottom: 10 }]}>Leave this drill?</Text>
-            <Text style={[S.hint, { marginBottom: 24 }]}>Your progress won't be saved.</Text>
+            <Text style={[S.hint, { marginBottom: 24 }]}>Progress is saved — you can pick up where you left off.</Text>
             <Btn label="LEAVE" onPress={onBack} style={{ marginBottom: 4 }} />
             <TouchableOpacity onPress={() => setShowLeave(false)} style={{ paddingVertical: 12 }}>
               <Text style={{ color: C.muted, fontSize: 14, fontWeight: '700' }}>Stay in drill</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {showRestart && (
+        <View style={S.backConfirmOverlay}>
+          <View style={S.backConfirmBox}>
+            <Text style={[S.screenTitle, { marginBottom: 10 }]}>Restart from Step 1?</Text>
+            <Text style={[S.hint, { marginBottom: 24 }]}>This clears your saved position for this card.</Text>
+            <Btn label="RESTART" onPress={doRestart} style={{ marginBottom: 4 }} />
+            <TouchableOpacity onPress={() => setShowRestart(false)} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: C.muted, fontSize: 14, fontWeight: '700' }}>Keep my progress</Text>
             </TouchableOpacity>
           </View>
         </View>

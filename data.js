@@ -2,9 +2,12 @@
 // Card data lives in cards.js — edit there to add/modify Move and Case Cards.
 
 import { Dimensions } from 'react-native';
-import { MOVE_CARDS, CASE_CARDS } from './cards';
+import { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS } from './cards';
 
-export { MOVE_CARDS, CASE_CARDS };
+export { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS };
+
+// All cards that can appear in a player's hand during a game.
+export const ALL_PLAY_CARDS = [...MOVE_CARDS, ...HAZARD_CARDS, ...COUNTER_CARDS];
 
 const { width } = Dimensions.get('window');
 
@@ -58,7 +61,7 @@ export function getDailyDraw() {
   };
 }
 
-// ── Move card dealing (New Case flow) ─────────────────────────────────────
+// ── Move card dealing (Daily Quick Draw — move cards only) ────────────────
 // count: how many cards to deal (default 2; pass 4 to deal for both players at once)
 // Forces NOVICE tier until the player has 10+ rounds in history.
 export function dealMoveCards(historyLength, count = 2) {
@@ -73,4 +76,32 @@ export function dealMoveCards(historyLength, count = 2) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr.slice(0, n);
+}
+
+// ── Full-hand dealing (New Case flow) ─────────────────────────────────────
+// Deals from the combined pool: move cards (tier-gated) + hazard + counter.
+// count: how many cards to deal total (default 2 per player; pass 4 for both at once).
+export function dealCards(historyLength, count = 2) {
+  const movePool = historyLength < 10
+    ? MOVE_CARDS.filter(c => c.tier === 'BRONZE')
+    : MOVE_CARDS;
+  const pool = [...movePool, ...HAZARD_CARDS, ...COUNTER_CARDS];
+  const arr = [...pool];
+  const n = Math.min(count, arr.length);
+  for (let i = 0; i < n; i++) {
+    const j = i + Math.floor(Math.random() * (arr.length - i));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, n);
+}
+
+// Draw a single replacement card, excluding cards already in hand.
+export function drawOneCard(historyLength, excludeIds = []) {
+  const movePool = historyLength < 10
+    ? MOVE_CARDS.filter(c => c.tier === 'BRONZE')
+    : MOVE_CARDS;
+  const pool = [...movePool, ...HAZARD_CARDS, ...COUNTER_CARDS]
+    .filter(c => !excludeIds.includes(c.id));
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
 }

@@ -15,6 +15,7 @@ export const MOVE_CARDS = [
   // ── BRONZE tier ───────────────────────────────────────────────────────────
   {
     id: 'm-b1', name: 'THE FAIR PLAY', icon: '🚩⚖️',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#1A0000', accent: '#F87171',
     what: 'Appeal to fairness and the rules to make your point feel like the obvious right thing to do.',
@@ -24,6 +25,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b2', name: 'THE KIND HEART', icon: '🧥💗',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#1A0A12', accent: '#F9A8D4',
     what: "Show you understand your opponent's feelings first, then steer gently toward the kinder choice.",
@@ -33,6 +35,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b3', name: 'THE GOLDEN RULE', icon: '🪙🤝',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#0A1A15', accent: '#6EE7B7',
     what: 'Find the bigger goal underneath the whole debate and show your answer serves everyone.',
@@ -42,6 +45,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b4', name: 'THE PINKY PROMISE', icon: '🤞✨',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#1A1200', accent: '#FCD34D',
     what: 'Make such a sincere, specific commitment that your certainty itself becomes the argument.',
@@ -51,6 +55,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b5', name: 'THE TEAM', icon: '🐾⭐',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#000D1A', accent: '#93C5FD',
     what: 'Show how your position benefits everybody — the whole group, not just yourself.',
@@ -60,6 +65,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b6', name: 'THE BEST FRIEND', icon: '🤠👢',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#1A0A00', accent: '#FDBA74',
     what: 'Calmly and stubbornly stick to your position no matter how much pressure is applied.',
@@ -69,6 +75,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b7', name: "THE LION'S COURAGE", icon: '🦁🌄',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#1A1200', accent: '#FDE68A',
     what: 'Admit a weakness in your own argument openly, then explain why you are still right.',
@@ -78,6 +85,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm-b8', name: 'BE RESPONSIBLE', icon: '⭐🛡️',
+    cardType: 'move',
     tier: 'BRONZE', tierLabel: 'NOVICE',
     bg: '#0F001A', accent: '#C4B5FD',
     what: 'Argue for what is fair and good for everyone around you, not just what you want.',
@@ -88,6 +96,7 @@ export const MOVE_CARDS = [
   // ── SILVER tier ───────────────────────────────────────────────────────────
   {
     id: 'm1', name: 'THE CHARMING BLUFF', icon: '🗡️🎭',
+    cardType: 'move',
     tier: 'SILVER', tierLabel: 'TACTICIAN',
     bg: '#1C2333', accent: '#A0AEC0',
     what: 'Say something bold or wildly exaggerated and deliver it with total, unshakeable confidence.',
@@ -97,6 +106,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm3', name: 'THE HONEST TALE', icon: '🎩🪵',
+    cardType: 'move',
     tier: 'SILVER', tierLabel: 'STORYTELLER',
     bg: '#1A1200', accent: '#C8A96E',
     what: 'Tell a short, folksy story or fable that makes your argument feel like pure common sense.',
@@ -107,6 +117,7 @@ export const MOVE_CARDS = [
   // ── GOLD tier ─────────────────────────────────────────────────────────────
   {
     id: 'm2', name: 'PAINT THE FUTURE', icon: '🌅🎨',
+    cardType: 'move',
     tier: 'GOLD', tierLabel: 'ORATOR',
     bg: '#2D1B00', accent: '#ECC94B',
     what: 'Abandon the current argument entirely and paint a vivid, irresistible picture of a better world.',
@@ -116,6 +127,7 @@ export const MOVE_CARDS = [
   },
   {
     id: 'm4', name: 'THE BRIDGE BUILDER', icon: '🤝🧱',
+    cardType: 'move',
     tier: 'GOLD', tierLabel: 'MASTER',
     bg: '#001A10', accent: '#68D391',
     what: 'Find surprising common ground with your opponent, then show your solution serves both of you.',
@@ -123,12 +135,95 @@ export const MOVE_CARDS = [
     inspiration: 'Nelson Mandela',
     status: 'active',
   },
-  // ── Add more Move Cards below ──────────────────────────────────────────────
-  // { id: 'm5', name: 'CARD NAME', icon: '🔥', tier: 'BRONZE', tierLabel: 'NOVICE',
-  //   bg: '#1A0000', accent: '#FC8181',
-  //   what: 'One sentence: what this move IS.',
-  //   hint: 'One sentence: the structural cue — how to actually do it.',
-  //   inspiration: 'Name', status: 'active' },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// HAZARD CARDS — played at end of YOUR argument; restricts opponent's next turn
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Always APPEND — never insert.
+
+export const HAZARD_CARDS = [
+  {
+    id: 'h1', name: 'NO NUMBERS', icon: '🚫🔢',
+    cardType: 'hazard',
+    bg: '#1A0D00', accent: '#FB923C',
+    what: 'Your opponent cannot use any statistics, quantities, or numbers in their argument.',
+    hint: 'Play at the end of your turn. Any number = instant forfeit of their argument.',
+    status: 'active',
+  },
+  {
+    id: 'h2', name: 'ONE SENTENCE', icon: '✂️💬',
+    cardType: 'hazard',
+    bg: '#1A0800', accent: '#FCA5A5',
+    what: 'Your opponent must make their entire argument in a single sentence.',
+    hint: 'Play at the end of your turn. One sentence — no more.',
+    status: 'active',
+  },
+  {
+    id: 'h3', name: 'MUST USE NUMBERS', icon: '🔢⚡',
+    cardType: 'hazard',
+    bg: '#001A10', accent: '#4ADE80',
+    what: 'Your opponent must include at least one statistic or specific number in their argument.',
+    hint: 'Play at the end of your turn. No numbers = argument does not count.',
+    status: 'active',
+  },
+  {
+    id: 'h4', name: '5 YEAR OLD', icon: '👶🌈',
+    cardType: 'hazard',
+    bg: '#0D001A', accent: '#C084FC',
+    what: "Your opponent can only use words a 5-year-old would know. No big vocabulary.",
+    hint: 'Play at the end of your turn. Simple words only — the littlest kids must understand.',
+    status: 'active',
+  },
+  {
+    id: 'h5', name: '30 SECONDS', icon: '⏱️🔥',
+    cardType: 'hazard',
+    restrictDebateSecs: 30,
+    bg: '#1A0000', accent: '#F87171',
+    what: 'Your opponent has only 30 seconds to make their entire argument.',
+    hint: 'Play at the end of your turn. Their debate clock drops to 30 seconds.',
+    status: 'active',
+  },
+  {
+    id: 'h6', name: 'USE THE ROOM', icon: '🏠👁️',
+    cardType: 'hazard',
+    bg: '#001A1A', accent: '#67E8F9',
+    what: 'Your opponent must reference something physically visible in the room right now.',
+    hint: 'Play at the end of your turn. No mention of the room = argument does not count.',
+    status: 'active',
+  },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COUNTER CARDS — played as interrupts when your opponent finishes arguing
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Always APPEND — never insert.
+
+export const COUNTER_CARDS = [
+  {
+    id: 'c1', name: 'THE MAGNIFYING GLASS', icon: '🔍⚔️',
+    cardType: 'counter',
+    bg: '#001429', accent: '#38BDF8',
+    what: "Find and expose the exact flaw in your opponent's argument before making your own.",
+    hint: "Say 'The flaw in that argument is…' — name it precisely, then build yours on top.",
+    status: 'active',
+  },
+  {
+    id: 'c2', name: 'THE FEINT', icon: '🎭⚡',
+    cardType: 'counter',
+    bg: '#0D0029', accent: '#A78BFA',
+    what: "Agree loudly with their weakest point, then systematically destroy their strongest.",
+    hint: "'You're right about [X] — but that proves nothing, because [their strongest point falls].'",
+    status: 'active',
+  },
+  {
+    id: 'c3', name: 'THE MIRROR', icon: '🪞🔄',
+    cardType: 'counter',
+    bg: '#0A001A', accent: '#E879F9',
+    what: "Take their exact argument and reverse it — use their own words to prove the opposite.",
+    hint: "'Using your own logic — [their point] — that actually proves MY side, not yours.'",
+    status: 'active',
+  },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -40,25 +40,32 @@ export const ToggleRow = ({ label, value, onToggle, pts }) => (
 
 // ── Card views ─────────────────────────────────────────────────────────────
 
-export const MoveCardView = ({ card, compact }) => (
-  <View style={[S.card, { backgroundColor: card.bg }, compact && S.cardCompact]}>
-    <View style={[S.badge, { borderColor: card.accent }]}>
-      <Text style={[S.badgeTxt, { color: card.accent }]}>
-        MOVE CARD  ·  {card.tier}  ·  {card.tierLabel}
-      </Text>
+export const MoveCardView = ({ card, compact }) => {
+  const isHazard  = card.cardType === 'hazard';
+  const isCounter = card.cardType === 'counter';
+  const badgeText = isHazard  ? 'HAZARD CARD  ·  CHAOS'
+                  : isCounter ? 'COUNTER CARD  ·  INTERRUPT'
+                  : `MOVE CARD  ·  ${card.tier}  ·  ${card.tierLabel}`;
+  return (
+    <View style={[S.card, { backgroundColor: card.bg }, compact && S.cardCompact]}>
+      <View style={[S.badge, { borderColor: card.accent }]}>
+        <Text style={[S.badgeTxt, { color: card.accent }]}>{badgeText}</Text>
+      </View>
+      <Text style={compact ? S.cardArtSm : S.cardArt}>{card.icon}</Text>
+      <Text style={[S.cardTitle, compact && { fontSize: 16, marginBottom: 6 }]}>{card.name}</Text>
+      {!compact ? (
+        <>
+          <View style={[S.divider, { backgroundColor: card.accent }]} />
+          <Text style={S.cardDesc}>{card.what}</Text>
+          <Text style={S.cardHint}>{card.hint}</Text>
+        </>
+      ) : null}
+      {!isHazard && !isCounter ? (
+        <Text style={[S.cardInspo, { color: card.accent }]}>✦  {card.inspiration}</Text>
+      ) : null}
     </View>
-    <Text style={compact ? S.cardArtSm : S.cardArt}>{card.icon}</Text>
-    <Text style={[S.cardTitle, compact && { fontSize: 16, marginBottom: 6 }]}>{card.name}</Text>
-    {!compact ? (
-      <>
-        <View style={[S.divider, { backgroundColor: card.accent }]} />
-        <Text style={S.cardDesc}>{card.what}</Text>
-        <Text style={S.cardHint}>{card.hint}</Text>
-      </>
-    ) : null}
-    <Text style={[S.cardInspo, { color: card.accent }]}>✦  {card.inspiration}</Text>
-  </View>
-);
+  );
+};
 
 export const CaseCardView = ({ card }) => (
   <View style={S.caseCard}>
