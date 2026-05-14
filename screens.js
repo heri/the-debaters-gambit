@@ -4,17 +4,58 @@ import {
   TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { CARD_W, DEFAULT_DEBATE_SECS, MOVE_CARDS, sortedCases, formatTime, timerColor } from './data';
-import { DRILLS } from './drills';
+import { DRILLS, DRILLS_LEGACY } from './drills';
 import { C, S } from './styles';
 import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner } from './components';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
+// Graceful degradation: expo-av enables voice recording; falls back to install prompt if absent
+let Audio = null;
+try { Audio = require('expo-av').Audio; } catch (_) {}
+
+// ── History helpers ────────────────────────────────────────────────────────
+// Determine the current player's result for a saved game entry.
+// myName = players[0].name (first registered player = "you").
+const getResult = (h, myName) => {
+  if (!myName) return null;
+  const me = h.players.find(p => p.name === myName);
+  const them = h.players.find(p => p.name !== myName);
+  if (!me || !them) return null;
+  if (me.points > them.points) return 'WIN';
+  if (me.points < them.points) return 'LOSS';
+  return 'DRAW';
+};
+const resultColor = r => r === 'WIN' ? '#4ADE80' : r === 'LOSS' ? '#FC8181' : '#F5C842';
+
+const HistoryEntry = ({ item, myName }) => {
+  const result = getResult(item, myName);
+  const rc = result ? resultColor(result) : null;
+  return (
+    <View style={S.historyItem}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <Text style={[S.historyCase, { flex: 1, marginBottom: 0 }]}>{item.case}</Text>
+        {rc ? (
+          <View style={{ marginLeft: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: rc }}>
+            <Text style={{ fontSize: 10, fontWeight: '900', color: rc, letterSpacing: 1.5 }}>{result}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={S.historyScores}>
+        {item.players.map(p => (
+          <Text key={p.name} style={S.historyScore}>{p.name}  {p.points} pt{p.points !== 1 ? 's' : ''}</Text>
+        ))}
+      </View>
+      <Text style={S.historyDate}>{item.date}</Text>
+    </View>
+  );
+};
+
 // ── Home ───────────────────────────────────────────────────────────────────
 // dailyDraw: { caseCard, moveCard } — pre-seeded by today's date
 // canPlay: whether >= 2 players exist (disables the daily button if not)
 
-export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay }) => (
+export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay, history = [], myName }) => (
   <ScrollView
     contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 40 }]}
     style={{ backgroundColor: C.bg }}
@@ -45,6 +86,16 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay }) => (
     </TouchableOpacity>
 
     <Text style={[S.hint, { marginTop: 20 }]}>Step into the Parlour — tap ⚔️ to choose your case</Text>
+
+    {history.length > 0 ? (
+      <>
+        <View style={[S.sectionDivider, { marginTop: 28 }]} />
+        <Text style={[S.screenTitle, { marginTop: 8 }]}>HISTORY</Text>
+        {history.map(h => (
+          <HistoryEntry key={h.id} item={h} myName={myName} />
+        ))}
+      </>
+    ) : null}
   </ScrollView>
 );
 
@@ -156,7 +207,7 @@ export const HelpScreen = () => (
 
 // ── Account ────────────────────────────────────────────────────────────────
 
-export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRoundsChange, debateSecs, onDebateSecsChange, cornerTimeEnabled, onCornerTimeChange, history, isOnboarding }) => {
+export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRoundsChange, debateSecs, onDebateSecsChange, cornerTimeEnabled, onCornerTimeChange, history, isOnboarding, myName }) => {
   const [name, setName] = useState('');
 
   const submit = () => {
@@ -289,17 +340,7 @@ export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRound
             <View style={S.sectionDivider} />
             <Text style={[S.screenTitle, { marginTop: 8 }]}>HISTORY</Text>
             {history.map(h => (
-              <View key={h.id} style={S.historyItem}>
-                <Text style={S.historyCase}>{h.case}</Text>
-                <View style={S.historyScores}>
-                  {h.players.map(p => (
-                    <Text key={p.name} style={S.historyScore}>
-                      {p.name}  {p.points} pt{p.points !== 1 ? 's' : ''}
-                    </Text>
-                  ))}
-                </View>
-                <Text style={S.historyDate}>{h.date}</Text>
-              </View>
+              <HistoryEntry key={h.id} item={h} myName={myName} />
             ))}
           </>
         ) : null}
@@ -612,18 +653,14 @@ export const CornerTimeScreen = ({ player, moves, onReady }) => {
       <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 40, paddingBottom: 48 }]}>
         <Text style={S.screenLabel}>CORNER TIME  ·  {secondsLeft}s</Text>
 
-        <View style={[S.playerChip, { backgroundColor: C.teal, marginVertical: 12 }]}>
-          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}</Text>
-        </View>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: '#F5C842', textAlign: 'center', letterSpacing: 1, lineHeight: 38, marginTop: 8, marginBottom: 16 }}>
+          Prepare your case,{'\n'}{player.name}
+        </Text>
 
         <Image
           source={require('./argus_confident.png')}
-          style={{ width: CARD_W * 0.44, height: CARD_W * 0.44, resizeMode: 'contain', alignSelf: 'center', marginBottom: 8 }}
+          style={{ width: CARD_W * 0.44, height: CARD_W * 0.44, resizeMode: 'contain', alignSelf: 'center', marginBottom: 16 }}
         />
-
-        <Text style={[S.hint, { marginBottom: 24 }]}>
-          Read your move cards.{'\n'}Jot a note. Plan your argument.
-        </Text>
 
         {moves.length > 0 ? (
           <>
@@ -645,13 +682,21 @@ export const CornerTimeScreen = ({ player, moves, onReady }) => {
 // ── Debate: depleting progress bar + dealt move card picker ───────────────
 // moves: Card[] — each player's own 2 dealt cards (or 1 for daily mode)
 // debateSecs: total seconds for this player's turn (configurable from Account)
-// onDone(selectedMove | null) hands control back to the parent.
+// onDone(selectedMove | null, noteText) hands control back to the parent.
 
 export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSecs = DEFAULT_DEBATE_SECS, onDone }) => {
   const [secondsLeft, setSecondsLeft] = useState(debateSecs);
   const [selectedMove, setSelectedMove] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [inputMode, setInputMode] = useState('text'); // 'text' | 'voice'
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingObj, setRecordingObj] = useState(null);
+  const [recordingUri, setRecordingUri] = useState(null);
   const intervalRef = useRef(null);
+  const savedNoteRef = useRef('');
+
+  useEffect(() => { savedNoteRef.current = noteText; }, [noteText]);
 
   useEffect(() => {
     if (showModal) return;
@@ -668,13 +713,33 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
     return () => clearInterval(intervalRef.current);
   }, [showModal]);
 
+  const startRecording = async () => {
+    if (!Audio) return;
+    try {
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecordingObj(recording);
+      setIsRecording(true);
+    } catch (_) {}
+  };
+
+  const stopRecording = async () => {
+    if (!recordingObj) return;
+    try {
+      await recordingObj.stopAndUnloadAsync();
+      const uri = recordingObj.getURI();
+      setRecordingUri(uri);
+    } catch (_) {}
+    setRecordingObj(null);
+    setIsRecording(false);
+  };
+
   const tColor = timerColor(secondsLeft);
   const toggleMove = card =>
     setSelectedMove(prev => (prev?.id === card.id ? null : card));
-
-  const movePickerLabel = moves.length === 1
-    ? 'YOUR MOVE CARD — slip it in any time for +1 bonus  ⭐'
-    : 'YOUR MOVE CARDS — slip one in any time for +1 bonus  ⭐';
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -693,17 +758,101 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
       </View>
 
       <ScrollView contentContainerStyle={S.scrollContent} showsVerticalScrollIndicator={false}>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 38, marginTop: 8, marginBottom: 16 }}>
+          State your case,{'\n'}{player.name}
+        </Text>
+
         <CaseBanner card={caseCard} />
 
         <View style={S.scoringHint}>
           <Text style={S.scoringHintTxt}>
-            ⚔️  1 pt for winning  ·  ⭐ +1 bonus if you slip in a move
+            ⚔️  1 pt for winning  ·  ⭐ +1 bonus if you use a move card
           </Text>
+        </View>
+
+        {/* Note input — text or voice */}
+        <View style={{ marginTop: 20 }}>
+          <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+            {['text', 'voice'].map(mode => (
+              <TouchableOpacity
+                key={mode}
+                onPress={() => setInputMode(mode)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 8,
+                  alignItems: 'center',
+                  borderBottomWidth: 2,
+                  borderBottomColor: inputMode === mode ? C.teal : C.border,
+                }}
+              >
+                <Text style={{ color: inputMode === mode ? C.teal : C.muted, fontWeight: '700', fontSize: 12, letterSpacing: 1 }}>
+                  {mode === 'text' ? '✏️  NOTES' : '🎙  VOICE'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {inputMode === 'text' ? (
+            <TextInput
+              style={{
+                backgroundColor: C.surface,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: C.border,
+                color: '#E8E0D0',
+                fontSize: 15,
+                lineHeight: 22,
+                padding: 14,
+                minHeight: 100,
+                textAlignVertical: 'top',
+              }}
+              placeholder="Jot down your argument…"
+              placeholderTextColor={C.muted}
+              multiline
+              value={noteText}
+              onChangeText={setNoteText}
+            />
+          ) : Audio ? (
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              {isRecording ? (
+                <>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FC8181', marginBottom: 10 }} />
+                  <Text style={{ color: '#FC8181', fontWeight: '700', fontSize: 12, letterSpacing: 1, marginBottom: 16 }}>RECORDING…</Text>
+                  <TouchableOpacity
+                    onPress={stopRecording}
+                    style={{ backgroundColor: '#FC8181', borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}
+                  >
+                    <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>⏹  STOP</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {recordingUri ? (
+                    <Text style={{ color: C.teal, fontSize: 12, marginBottom: 12, letterSpacing: 0.5 }}>Recording saved ✓</Text>
+                  ) : null}
+                  <TouchableOpacity
+                    onPress={startRecording}
+                    style={{ backgroundColor: C.teal, borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}
+                  >
+                    <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>🎙  START RECORDING</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          ) : (
+            <View style={{ backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 16, alignItems: 'center' }}>
+              <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+                Voice recording requires{'\n'}
+                <Text style={{ color: C.gold, fontWeight: '700' }}>expo-av</Text>
+                {' '}to be installed.{'\n\n'}Run:{' '}
+                <Text style={{ color: C.teal, fontWeight: '700' }}>npx expo install expo-av</Text>
+              </Text>
+            </View>
+          )}
         </View>
 
         {moves.length > 0 ? (
           <>
-            <Text style={[S.screenLabel, { marginTop: 20 }]}>{movePickerLabel}</Text>
             {moves.map(card => {
               const selected = selectedMove?.id === card.id;
               const dimmed = selectedMove !== null && !selected;
@@ -762,7 +911,7 @@ export const DebateScreen = ({ caseCard, player, nextPlayerName, moves, debateSe
             </Text>
             <Btn
               label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
-              onPress={() => onDone(selectedMove)}
+              onPress={() => onDone(selectedMove, savedNoteRef.current)}
             />
           </View>
         </View>
@@ -897,14 +1046,241 @@ export const PointsScreen = ({ player1, player2, roundHistory, caseCard, onSave 
 };
 
 // ── Solo Dojo ──────────────────────────────────────────────────────────────
-// completedDrills: string[] — card IDs the player has fully drilled at least once
-// onComplete(cardId)        — called when both steps of a drill are finished
 
+const ARGUS_IMAGES = {
+  confident:   require('./argus_confident.png'),
+  suspicious:  require('./argus_suspicious.png'),
+  smug:        require('./argus_smug.png'),
+  encouraging: require('./argus_encouraging.png'),
+  thinking:    require('./argus_thinking.png'),
+  dramatic:    require('./argus_dramatic.png'),
+};
+
+const DrillRunner = ({ drill, card, onComplete, onBack }) => {
+  const [stepIdx, setStepIdx]       = useState(0);
+  const [screenIdx, setScreenIdx]   = useState(0);
+  const [phase, setPhase]           = useState('viewing'); // 'viewing' | 'answered'
+  const [selectedIdx, setSelectedIdx] = useState(null);
+  const [wasCorrect, setWasCorrect] = useState(false);
+  const [saidIt, setSaidIt]         = useState(false);
+  const [secsLeft, setSecsLeft]     = useState(15);
+  const [showLeave, setShowLeave]   = useState(false);
+  const timerRef = useRef(null);
+
+  const currentStep   = drill.steps[stepIdx];
+  const currentScreen = currentStep.screens[screenIdx];
+
+  const totalScreens = drill.steps.reduce((n, s) => n + s.screens.length, 0);
+  const doneScreens  = drill.steps.slice(0, stepIdx).reduce((n, s) => n + s.screens.length, 0) + screenIdx;
+  const progress     = doneScreens / totalScreens;
+
+  useEffect(() => {
+    if (currentScreen.type !== 'deliver') return;
+    const secs = currentScreen.timerSecs || 15;
+    setSecsLeft(secs);
+    timerRef.current = setInterval(() => {
+      setSecsLeft(s => { if (s <= 1) { clearInterval(timerRef.current); return 0; } return s - 1; });
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [stepIdx, screenIdx]);
+
+  const advance = () => {
+    const screens = currentStep.screens;
+    if (screenIdx < screens.length - 1) {
+      setScreenIdx(screenIdx + 1);
+    } else if (stepIdx < drill.steps.length - 1) {
+      setStepIdx(stepIdx + 1);
+      setScreenIdx(0);
+    }
+    setPhase('viewing');
+    setSelectedIdx(null);
+    setWasCorrect(false);
+  };
+
+  const argusImg = () => {
+    const base = currentScreen.argusExpression || 'thinking';
+    if (currentScreen.type === 'question' && phase === 'answered') {
+      return wasCorrect ? 'smug' : 'suspicious';
+    }
+    return base;
+  };
+
+  const letters = ['A', 'B', 'C'];
+
+  if (currentScreen.type === 'completion') {
+    return (
+      <View style={[S.screen, { padding: 32 }]}>
+        <Image
+          source={ARGUS_IMAGES[saidIt ? 'smug' : 'encouraging']}
+          style={{ width: CARD_W * 0.55, height: CARD_W * 0.55, resizeMode: 'contain', marginBottom: 20 }}
+        />
+        <Text style={S.screenTitle}>{card.name}</Text>
+        <Text style={[S.heroTagline, { marginTop: 8, marginBottom: 32 }]}>
+          {saidIt ? currentScreen.saidText : currentScreen.skippedText}
+        </Text>
+        <Btn label="← BACK TO DOJO" onPress={onComplete} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 48 }]}>
+
+        <TouchableOpacity
+          onPress={() => setShowLeave(true)}
+          style={{ alignSelf: 'flex-start', marginBottom: 12, padding: 4 }}
+        >
+          <Text style={{ color: C.muted, fontSize: 13, fontWeight: '700', letterSpacing: 1 }}>← DOJO</Text>
+        </TouchableOpacity>
+
+        <View style={S.drillProgressBar}>
+          <View style={[S.drillProgressFill, { width: `${progress * 100}%` }]} />
+        </View>
+
+        <Text style={S.drillStepBadge}>STEP {currentStep.step} · {currentStep.title.toUpperCase()}</Text>
+
+        <Text style={[S.screenLabel, { marginBottom: 8 }]}>{card.icon}  {card.name}</Text>
+
+        <Image
+          source={ARGUS_IMAGES[argusImg()]}
+          style={{ width: CARD_W * 0.38, height: CARD_W * 0.38, resizeMode: 'contain', alignSelf: 'center', marginBottom: 16 }}
+        />
+
+        {currentScreen.type === 'info' && (
+          <>
+            {currentScreen.quote ? (
+              <View style={S.drillQuoteBubble}>
+                <Text style={S.drillQuoteTxt}>"{currentScreen.quote}"</Text>
+              </View>
+            ) : null}
+            {currentScreen.heading ? (
+              <Text style={S.drillInfoHeading}>{currentScreen.heading}</Text>
+            ) : null}
+            {currentScreen.body ? (
+              <Text style={S.drillInfoBody}>{currentScreen.body}</Text>
+            ) : null}
+            {currentScreen.note ? (
+              <View style={S.drillArgusNote}>
+                <Text style={S.drillArgusNoteTxt}>{currentScreen.note}</Text>
+              </View>
+            ) : null}
+            <Btn label={currentScreen.cta || 'Continue  →'} onPress={advance} style={{ marginTop: 20 }} />
+          </>
+        )}
+
+        {currentScreen.type === 'question' && (
+          <>
+            <Text style={S.drillQuestion}>{currentScreen.prompt}</Text>
+            {currentScreen.options.map((opt, idx) => {
+              let rowStyle = S.drillOption;
+              let badgeStyle = S.drillOptionLetter;
+              let badgeTxtStyle = S.drillOptionLetterTxt;
+              if (phase === 'answered') {
+                if (opt.correct) {
+                  rowStyle = [S.drillOption, S.drillOptionCorrect];
+                  badgeStyle = [S.drillOptionLetter, { backgroundColor: '#15803D' }];
+                  badgeTxtStyle = [S.drillOptionLetterTxt, { color: '#E8DFC8' }];
+                } else if (idx === selectedIdx) {
+                  rowStyle = [S.drillOption, S.drillOptionWrong];
+                  badgeStyle = [S.drillOptionLetter, { backgroundColor: '#9B1C1C' }];
+                  badgeTxtStyle = [S.drillOptionLetterTxt, { color: '#E8DFC8' }];
+                } else {
+                  rowStyle = [S.drillOption, { opacity: 0.4 }];
+                }
+              }
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={rowStyle}
+                  onPress={() => {
+                    if (phase !== 'viewing') return;
+                    setSelectedIdx(idx);
+                    setWasCorrect(opt.correct);
+                    setPhase('answered');
+                  }}
+                  activeOpacity={phase === 'viewing' ? 0.8 : 1}
+                >
+                  <View style={badgeStyle}><Text style={badgeTxtStyle}>{letters[idx]}</Text></View>
+                  <Text style={S.drillOptionTxt}>{opt.text}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            {phase === 'answered' && (
+              <>
+                <View style={[S.drillFeedback, wasCorrect ? S.drillFeedbackOk : S.drillFeedbackOops]}>
+                  <Text style={S.drillFeedbackTxt}>
+                    {currentScreen.options[selectedIdx]?.feedback}
+                  </Text>
+                </View>
+                {wasCorrect ? (
+                  <Btn label="Continue  →" onPress={advance} style={{ marginTop: 12 }} />
+                ) : (
+                  <Btn
+                    label="Try again"
+                    onPress={() => { setPhase('viewing'); setSelectedIdx(null); }}
+                    style={{ marginTop: 12 }}
+                  />
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {currentScreen.type === 'deliver' && (
+          <>
+            <View style={S.drillDeliverBar}>
+              <View style={[S.drillDeliverBarFill, { width: `${(secsLeft / (currentScreen.timerSecs || 15)) * 100}%` }]} />
+            </View>
+            <View style={S.drillDeliverCard}>
+              <Text style={S.drillDeliverText}>{currentScreen.body}</Text>
+            </View>
+            {currentScreen.caption ? (
+              <Text style={S.drillDeliverCaption}>{currentScreen.caption}</Text>
+            ) : null}
+            <Btn
+              label="🎤  I said it!"
+              onPress={() => { clearInterval(timerRef.current); setSaidIt(true); advance(); }}
+              style={{ marginTop: 4 }}
+            />
+            <TouchableOpacity
+              onPress={() => { clearInterval(timerRef.current); advance(); }}
+              style={{ paddingVertical: 14 }}
+            >
+              <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center', letterSpacing: 0.5 }}>
+                Skip this time
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+      </ScrollView>
+
+      {showLeave && (
+        <View style={S.backConfirmOverlay}>
+          <View style={S.backConfirmBox}>
+            <Text style={[S.screenTitle, { marginBottom: 10 }]}>Leave this drill?</Text>
+            <Text style={[S.hint, { marginBottom: 24 }]}>Your progress won't be saved.</Text>
+            <Btn label="LEAVE" onPress={onBack} style={{ marginBottom: 4 }} />
+            <TouchableOpacity onPress={() => setShowLeave(false)} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: C.muted, fontSize: 14, fontWeight: '700' }}>Stay in drill</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// completedDrills: string[] — card IDs the player has fully drilled at least once
+// onComplete(cardId)        — called when a drill is finished
 export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
   const [view, setView]               = useState('select'); // 'select' | 'drill'
   const [currentCard, setCurrentCard] = useState(null);
-  const [step, setStep]               = useState(0);          // 0 or 1
-  const [phase, setPhase]             = useState('question'); // 'question' | 'feedback' | 'complete'
+
+  // Legacy drill state (Silver/Gold cards, 2-step format)
+  const [step, setStep]               = useState(0);
+  const [phase, setPhase]             = useState('question');
   const [selectedOption, setSelectedOption] = useState(null);
   const [wasCorrect, setWasCorrect]   = useState(false);
 
@@ -928,26 +1304,6 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
     setSelectedOption(null);
     setWasCorrect(false);
     setView('drill');
-  };
-
-  const handleOption = idx => {
-    if (phase !== 'question') return;
-    const correct = DRILLS[currentCard.id].steps[step].correct === idx;
-    setSelectedOption(idx);
-    setWasCorrect(correct);
-    setPhase('feedback');
-  };
-
-  const handleNext = () => {
-    if (step === 0) {
-      setStep(1);
-      setPhase('question');
-      setSelectedOption(null);
-      setWasCorrect(false);
-    } else {
-      onComplete(currentCard.id);
-      setPhase('complete');
-    }
   };
 
   const handleBack = () => {
@@ -1023,9 +1379,23 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
     );
   }
 
-  // ── Drill view ─────────────────────────────────────────────────────────────
+  // ── New 5-step drill format (Bronze cards) ─────────────────────────────────
 
-  const drill = DRILLS[currentCard?.id];
+  const newDrill = DRILLS[currentCard?.id];
+  if (newDrill) {
+    return (
+      <DrillRunner
+        drill={newDrill}
+        card={currentCard}
+        onComplete={() => { onComplete(currentCard.id); handleBack(); }}
+        onBack={handleBack}
+      />
+    );
+  }
+
+  // ── Legacy 2-step drill format (Silver / Gold cards) ───────────────────────
+
+  const drill = DRILLS_LEGACY[currentCard?.id];
   if (!drill) return null;
   const currentStep = drill.steps[step];
 
@@ -1063,6 +1433,26 @@ export const SoloDojoScreen = ({ completedDrills, onComplete }) => {
       return [S.drillOptionLetterTxt, { color: '#E8DFC8' }];
     }
     return S.drillOptionLetterTxt;
+  };
+
+  const handleOption = idx => {
+    if (phase !== 'question') return;
+    const correct = currentStep.correct === idx;
+    setSelectedOption(idx);
+    setWasCorrect(correct);
+    setPhase('feedback');
+  };
+
+  const handleNext = () => {
+    if (step === 0) {
+      setStep(1);
+      setPhase('question');
+      setSelectedOption(null);
+      setWasCorrect(false);
+    } else {
+      onComplete(currentCard.id);
+      setPhase('complete');
+    }
   };
 
   return (

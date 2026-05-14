@@ -1,58 +1,246 @@
-import { DRILLS } from '../drills';
+import { DRILLS, DRILLS_LEGACY } from '../drills';
 import { MOVE_CARDS } from '../data';
 
-// ── DRILLS completeness ───────────────────────────────────────────────────
+const BRONZE_CARDS = MOVE_CARDS.filter(c => c.tier === 'BRONZE');
+const SILVER_GOLD_CARDS = MOVE_CARDS.filter(c => c.tier === 'SILVER' || c.tier === 'GOLD');
 
-describe('DRILLS completeness', () => {
+// ── DRILLS (5-step Bronze format) ─────────────────────────────────────────
+
+describe('DRILLS — presence', () => {
   test('DRILLS is a non-empty object', () => {
     expect(typeof DRILLS).toBe('object');
     expect(DRILLS).not.toBeNull();
     expect(Object.keys(DRILLS).length).toBeGreaterThan(0);
   });
 
-  test('every move card has a corresponding drill entry', () => {
-    MOVE_CARDS.forEach(card => {
+  test('every Bronze move card has a corresponding DRILLS entry', () => {
+    BRONZE_CARDS.forEach(card => {
       expect(DRILLS).toHaveProperty(card.id);
     });
   });
 
-  test('no drill references a card ID that does not exist in MOVE_CARDS', () => {
-    const validIds = new Set(MOVE_CARDS.map(c => c.id));
-    Object.keys(DRILLS).forEach(drillId => {
-      expect(validIds.has(drillId)).toBe(true);
+  test('DRILLS contains only Bronze card IDs', () => {
+    const bronzeIds = new Set(BRONZE_CARDS.map(c => c.id));
+    Object.keys(DRILLS).forEach(id => {
+      expect(bronzeIds.has(id)).toBe(true);
     });
   });
 
-  test('drill count matches MOVE_CARDS count', () => {
-    expect(Object.keys(DRILLS).length).toBe(MOVE_CARDS.length);
+  test('DRILLS count matches Bronze card count', () => {
+    expect(Object.keys(DRILLS).length).toBe(BRONZE_CARDS.length);
   });
 });
 
-// ── DRILLS structure ──────────────────────────────────────────────────────
-
-describe('DRILLS structure — every drill', () => {
-  test('has a steps array', () => {
+describe('DRILLS — drill structure', () => {
+  test('every drill has a cardId string', () => {
     Object.entries(DRILLS).forEach(([id, drill]) => {
+      expect(typeof drill.cardId).toBe('string');
+      expect(drill.cardId.trim().length).toBeGreaterThan(0);
+      expect(drill.cardId).toBe(id);
+    });
+  });
+
+  test('every drill has a steps array', () => {
+    Object.entries(DRILLS).forEach(([, drill]) => {
       expect(Array.isArray(drill.steps)).toBe(true);
     });
   });
 
-  test('has exactly 2 steps', () => {
+  test('every drill has exactly 5 steps', () => {
     Object.entries(DRILLS).forEach(([id, drill]) => {
-      expect(drill.steps).toHaveLength(2);
+      expect(drill.steps).toHaveLength(5);
+    });
+  });
+
+  test('every step has a screens array', () => {
+    Object.entries(DRILLS).forEach(([, drill]) => {
+      drill.steps.forEach(step => {
+        expect(Array.isArray(step.screens)).toBe(true);
+        expect(step.screens.length).toBeGreaterThan(0);
+      });
     });
   });
 });
 
-// ── Step structure ─────────────────────────────────────────────────────────
+describe('DRILLS — screen structure', () => {
+  const VALID_TYPES = ['info', 'question', 'deliver', 'completion'];
+  const VALID_EXPRESSIONS = ['confident', 'suspicious', 'smug', 'encouraging', 'thinking', 'dramatic'];
 
-describe('DRILLS step structure — every step', () => {
-  const REQUIRED_STEP_FIELDS = ['argus', 'question', 'options', 'correct', 'feedbackOk', 'feedbackOops'];
+  test('every screen has a unique non-empty id', () => {
+    const allIds = [];
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.forEach(screen => {
+          expect(typeof screen.id).toBe('string');
+          expect(screen.id.trim().length).toBeGreaterThan(0);
+          allIds.push(screen.id);
+        });
+      });
+    });
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
 
-  test('has all required fields', () => {
+  test('every screen has a valid type', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.forEach(screen => {
+          expect(VALID_TYPES).toContain(screen.type);
+        });
+      });
+    });
+  });
+
+  test('every non-completion screen has a valid argusExpression', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type !== 'completion').forEach(screen => {
+          expect(VALID_EXPRESSIONS).toContain(screen.argusExpression);
+        });
+      });
+    });
+  });
+
+  test('info screens have a non-empty body or quote', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'info').forEach(screen => {
+          const hasContent = (screen.body && screen.body.trim().length > 0)
+            || (screen.quote && screen.quote.trim().length > 0);
+          expect(hasContent).toBe(true);
+        });
+      });
+    });
+  });
+
+  test('question screens have a non-empty prompt', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'question').forEach(screen => {
+          expect(typeof screen.prompt).toBe('string');
+          expect(screen.prompt.trim().length).toBeGreaterThan(0);
+        });
+      });
+    });
+  });
+
+  test('question screens have exactly 3 options', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'question').forEach(screen => {
+          expect(Array.isArray(screen.options)).toBe(true);
+          expect(screen.options).toHaveLength(3);
+        });
+      });
+    });
+  });
+
+  test('question screen options each have text, correct flag, and feedback', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'question').forEach(screen => {
+          screen.options.forEach(opt => {
+            expect(typeof opt.text).toBe('string');
+            expect(opt.text.trim().length).toBeGreaterThan(0);
+            expect(typeof opt.correct).toBe('boolean');
+            expect(typeof opt.feedback).toBe('string');
+            expect(opt.feedback.trim().length).toBeGreaterThan(0);
+          });
+        });
+      });
+    });
+  });
+
+  test('each question screen has exactly one correct option', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'question').forEach(screen => {
+          const correctCount = screen.options.filter(o => o.correct).length;
+          expect(correctCount).toBe(1);
+        });
+      });
+    });
+  });
+
+  test('deliver screens have a non-empty body and caption', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'deliver').forEach(screen => {
+          expect(typeof screen.body).toBe('string');
+          expect(screen.body.trim().length).toBeGreaterThan(0);
+          expect(typeof screen.caption).toBe('string');
+          expect(screen.caption.trim().length).toBeGreaterThan(0);
+        });
+      });
+    });
+  });
+
+  test('deliver screens have a positive timerSecs', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'deliver').forEach(screen => {
+          expect(typeof screen.timerSecs).toBe('number');
+          expect(screen.timerSecs).toBeGreaterThan(0);
+        });
+      });
+    });
+  });
+
+  test('completion screens have saidText and skippedText', () => {
+    Object.values(DRILLS).forEach(drill => {
+      drill.steps.forEach(step => {
+        step.screens.filter(s => s.type === 'completion').forEach(screen => {
+          expect(typeof screen.saidText).toBe('string');
+          expect(screen.saidText.trim().length).toBeGreaterThan(0);
+          expect(typeof screen.skippedText).toBe('string');
+          expect(screen.skippedText.trim().length).toBeGreaterThan(0);
+        });
+      });
+    });
+  });
+
+  test('step 5 (index 4) contains a deliver and a completion screen', () => {
     Object.entries(DRILLS).forEach(([id, drill]) => {
-      drill.steps.forEach((step, stepIdx) => {
-        REQUIRED_STEP_FIELDS.forEach(field => {
+      const lastStep = drill.steps[4];
+      const types = lastStep.screens.map(s => s.type);
+      expect(types).toContain('deliver');
+      expect(types).toContain('completion');
+    });
+  });
+});
+
+// ── DRILLS_LEGACY (2-step Silver/Gold format) ─────────────────────────────
+
+describe('DRILLS_LEGACY — presence', () => {
+  test('DRILLS_LEGACY is a non-empty object', () => {
+    expect(typeof DRILLS_LEGACY).toBe('object');
+    expect(DRILLS_LEGACY).not.toBeNull();
+    expect(Object.keys(DRILLS_LEGACY).length).toBeGreaterThan(0);
+  });
+
+  test('every Silver/Gold move card has a corresponding DRILLS_LEGACY entry', () => {
+    SILVER_GOLD_CARDS.forEach(card => {
+      expect(DRILLS_LEGACY).toHaveProperty(card.id);
+    });
+  });
+
+  test('DRILLS_LEGACY count matches Silver+Gold card count', () => {
+    expect(Object.keys(DRILLS_LEGACY).length).toBe(SILVER_GOLD_CARDS.length);
+  });
+});
+
+describe('DRILLS_LEGACY — step structure', () => {
+  const REQUIRED_FIELDS = ['argus', 'question', 'options', 'correct', 'feedbackOk', 'feedbackOops'];
+
+  test('every drill has exactly 2 steps', () => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
+      expect(drill.steps).toHaveLength(2);
+    });
+  });
+
+  test('every step has all required fields', () => {
+    Object.entries(DRILLS_LEGACY).forEach(([, drill]) => {
+      drill.steps.forEach(step => {
+        REQUIRED_FIELDS.forEach(field => {
           expect(step).toHaveProperty(field);
         });
       });
@@ -60,7 +248,7 @@ describe('DRILLS step structure — every step', () => {
   });
 
   test('argus is a non-empty string', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       drill.steps.forEach(step => {
         expect(typeof step.argus).toBe('string');
         expect(step.argus.trim().length).toBeGreaterThan(0);
@@ -69,7 +257,7 @@ describe('DRILLS step structure — every step', () => {
   });
 
   test('question is a non-empty string', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       drill.steps.forEach(step => {
         expect(typeof step.question).toBe('string');
         expect(step.question.trim().length).toBeGreaterThan(0);
@@ -77,30 +265,8 @@ describe('DRILLS step structure — every step', () => {
     });
   });
 
-  test('feedbackOk is a non-empty string', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
-      drill.steps.forEach(step => {
-        expect(typeof step.feedbackOk).toBe('string');
-        expect(step.feedbackOk.trim().length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  test('feedbackOops is a non-empty string', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
-      drill.steps.forEach(step => {
-        expect(typeof step.feedbackOops).toBe('string');
-        expect(step.feedbackOops.trim().length).toBeGreaterThan(0);
-      });
-    });
-  });
-});
-
-// ── Options ────────────────────────────────────────────────────────────────
-
-describe('DRILLS options', () => {
   test('every step has exactly 3 options', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       drill.steps.forEach(step => {
         expect(step.options).toHaveLength(3);
       });
@@ -108,7 +274,7 @@ describe('DRILLS options', () => {
   });
 
   test('all options are non-empty strings', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       drill.steps.forEach(step => {
         step.options.forEach(opt => {
           expect(typeof opt).toBe('string');
@@ -118,101 +284,43 @@ describe('DRILLS options', () => {
     });
   });
 
-  test('all 3 options within a step are distinct', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
-      drill.steps.forEach(step => {
-        const unique = new Set(step.options.map(o => o.trim().toLowerCase()));
-        expect(unique.size).toBe(3);
-      });
-    });
-  });
-});
-
-// ── Correct index ──────────────────────────────────────────────────────────
-
-describe('DRILLS correct index', () => {
-  test('correct is an integer', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
-      drill.steps.forEach(step => {
-        expect(Number.isInteger(step.correct)).toBe(true);
-      });
-    });
-  });
-
-  test('correct is within valid options range (0–2)', () => {
-    Object.entries(DRILLS).forEach(([id, drill]) => {
-      drill.steps.forEach(step => {
-        expect(step.correct).toBeGreaterThanOrEqual(0);
-        expect(step.correct).toBeLessThan(step.options.length);
-      });
-    });
-  });
-
-  test('correct is always 0 (option A is always the right answer)', () => {
-    // By design all correct answers are the first option.
-    // This test will catch accidental edits that break the pattern.
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+  test('correct is 0 for every step (option A is always right)', () => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       drill.steps.forEach(step => {
         expect(step.correct).toBe(0);
       });
     });
   });
-});
 
-// ── Completion step (step index 1) ─────────────────────────────────────────
+  test('feedbackOk and feedbackOops are non-empty strings', () => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
+      drill.steps.forEach(step => {
+        expect(step.feedbackOk.trim().length).toBeGreaterThan(0);
+        expect(step.feedbackOops.trim().length).toBeGreaterThan(0);
+      });
+    });
+  });
 
-describe('DRILLS step 2 (completion step)', () => {
-  test('feedbackOk contains the ⭐ star emoji', () => {
-    // The game shows this emoji on successful completion of step 2.
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+  test('step 2 feedbackOk contains the ⭐ star emoji', () => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       expect(drill.steps[1].feedbackOk).toContain('⭐');
     });
   });
 
-  test('feedbackOops on step 2 references option A', () => {
-    // Hints always point back to option A so the player knows the right answer.
-    Object.entries(DRILLS).forEach(([id, drill]) => {
+  test('step 2 feedbackOops references option A', () => {
+    Object.values(DRILLS_LEGACY).forEach(drill => {
       expect(drill.steps[1].feedbackOops).toMatch(/\bA\b/);
     });
   });
 });
 
-// ── SoloDojoScreen crash guards ────────────────────────────────────────────
-// These tests directly replicate the runtime access patterns in SoloDojoScreen
-// to ensure the patterns that caused crashes cannot regress.
+// ── No ID overlap between DRILLS and DRILLS_LEGACY ────────────────────────
 
-describe('SoloDojoScreen runtime access patterns', () => {
-  test('DRILLS[card.id] is never undefined for any move card', () => {
-    MOVE_CARDS.forEach(card => {
-      const drill = DRILLS[card.id];
-      expect(drill).not.toBeUndefined();
-      expect(drill).not.toBeNull();
-    });
-  });
-
-  test('drill.steps[0] and drill.steps[1] are both accessible without error', () => {
-    MOVE_CARDS.forEach(card => {
-      const drill = DRILLS[card.id];
-      expect(drill.steps[0]).toBeDefined();
-      expect(drill.steps[1]).toBeDefined();
-    });
-  });
-
-  test('drill.steps[0].options[correct] is the correct answer string', () => {
-    MOVE_CARDS.forEach(card => {
-      const drill = DRILLS[card.id];
-      drill.steps.forEach(step => {
-        expect(typeof step.options[step.correct]).toBe('string');
-        expect(step.options[step.correct].trim().length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  test('accessing a step index beyond 1 returns undefined safely', () => {
-    // SoloDojoScreen only uses steps 0 and 1. Verifying step 2 is undefined
-    // prevents accidental off-by-one regressions.
-    MOVE_CARDS.forEach(card => {
-      expect(DRILLS[card.id].steps[2]).toBeUndefined();
+describe('DRILLS and DRILLS_LEGACY — no ID overlap', () => {
+  test('Bronze IDs and Silver/Gold IDs are disjoint', () => {
+    const drillIds = new Set(Object.keys(DRILLS));
+    Object.keys(DRILLS_LEGACY).forEach(id => {
+      expect(drillIds.has(id)).toBe(false);
     });
   });
 });

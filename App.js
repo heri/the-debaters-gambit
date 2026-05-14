@@ -155,8 +155,8 @@ export default function App() {
     setActiveTab('game');
   };
 
-  const handleP1Done = move => { setCurrentP1Move(move); setGamePhase('pass_to_p2'); };
-  const handleP2Done = move => { setCurrentP2Move(move); setGamePhase('round_end'); };
+  const handleP1Done = (move, _note) => { setCurrentP1Move(move); setGamePhase('pass_to_p2'); };
+  const handleP2Done = (move, _note) => { setCurrentP2Move(move); setGamePhase('round_end'); };
 
   const handleNextRound = () => {
     setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: currentP2Move }]);
@@ -202,6 +202,8 @@ export default function App() {
         dailyDraw={dailyDraw}
         onPlayDaily={handlePlayDaily}
         canPlay={players.length >= 2}
+        history={history}
+        myName={players[0]?.name}
       />
     );
     if (activeTab === 'help') return <HelpScreen />;
@@ -224,6 +226,7 @@ export default function App() {
         onCornerTimeChange={setCornerTimeEnabled}
         history={history}
         isOnboarding={isOnboarding}
+        myName={players[0]?.name}
       />
     );
 

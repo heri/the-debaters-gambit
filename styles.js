@@ -454,4 +454,76 @@ export const S = StyleSheet.create({
     color: '#E8DFC8', fontWeight: '800', fontSize: 14, letterSpacing: 1.5,
   },
   dailyPlayBtnDisabled: { opacity: 0.4 },
+
+  // DrillRunner — progress bar
+  drillProgressBar: {
+    width: CARD_W, height: 3, backgroundColor: '#1C2038',
+    borderRadius: 2, marginBottom: 12,
+  },
+  drillProgressFill: {
+    height: 3, backgroundColor: '#F5C842', borderRadius: 2,
+  },
+
+  // DrillRunner — step badge
+  drillStepBadge: {
+    fontSize: 10, fontWeight: '700', color: '#6B7A8D',
+    letterSpacing: 2.5, marginBottom: 10, textAlign: 'center',
+  },
+
+  // DrillRunner — info heading / body
+  drillInfoHeading: {
+    fontSize: 20, fontWeight: '900', color: '#F5C842',
+    letterSpacing: 1, marginBottom: 12, textAlign: 'center',
+  },
+  drillInfoBody: {
+    fontSize: 15, color: 'rgba(232,223,200,0.9)', lineHeight: 26, textAlign: 'center',
+  },
+
+  // DrillRunner — quote bubble (Step 2 feeling screens)
+  drillQuoteBubble: {
+    width: CARD_W, backgroundColor: '#131728', borderRadius: 16,
+    padding: 18, marginBottom: 12,
+    borderLeftWidth: 3, borderLeftColor: '#2ECFB0',
+  },
+  drillQuoteTxt: {
+    fontSize: 15, color: '#E8DFC8', lineHeight: 26, fontStyle: 'italic',
+  },
+
+  // DrillRunner — Argus annotation note
+  drillArgusNote: { marginTop: 12 },
+  drillArgusNoteTxt: {
+    fontSize: 13, color: '#6B7A8D', lineHeight: 22, fontStyle: 'italic', textAlign: 'center',
+  },
+
+  // DrillRunner — deliver parchment card
+  drillDeliverCard: {
+    width: CARD_W, backgroundColor: '#1A1200', borderRadius: 16,
+    padding: 22, marginBottom: 16,
+    borderWidth: 1.5, borderColor: '#F5C842',
+  },
+  drillDeliverText: {
+    fontSize: 16, color: '#E8DFC8', lineHeight: 28, fontStyle: 'italic', textAlign: 'center',
+  },
+  drillDeliverCaption: {
+    fontSize: 13, color: '#6B7A8D', lineHeight: 22, textAlign: 'center', marginBottom: 16,
+  },
+
+  // DrillRunner — 15s depleting timer bar
+  drillDeliverBar: {
+    width: CARD_W, height: 4, backgroundColor: '#1C2038',
+    borderRadius: 2, marginBottom: 20, overflow: 'hidden',
+  },
+  drillDeliverBarFill: {
+    height: 4, backgroundColor: '#2ECFB0', borderRadius: 2,
+  },
+
+  // DrillRunner — back confirmation overlay
+  backConfirmOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.88)', alignItems: 'center', justifyContent: 'center', padding: 32,
+  },
+  backConfirmBox: {
+    backgroundColor: '#131728', borderRadius: 24, padding: 28,
+    width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#1C2038',
+  },
 });
