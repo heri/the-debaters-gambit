@@ -19,13 +19,8 @@ try { Audio = require('expo-av').Audio; } catch (_) {}
 // Determine the current player's result for a saved game entry.
 // myName = players[0].name (first registered player = "you").
 const getResult = (h, myName) => {
-  if (!myName) return null;
-  const me = h.players.find(p => p.name === myName);
-  const them = h.players.find(p => p.name !== myName);
-  if (!me || !them) return null;
-  if (me.points > them.points) return 'WIN';
-  if (me.points < them.points) return 'LOSS';
-  return 'DRAW';
+  if (!myName || !h.winner) return null;
+  return h.winner === myName ? 'WIN' : 'LOSS';
 };
 const resultColor = r => r === 'WIN' ? '#4ADE80' : r === 'LOSS' ? '#FC8181' : '#F5C842';
 
@@ -42,11 +37,11 @@ const HistoryEntry = ({ item, myName }) => {
           </View>
         ) : null}
       </View>
-      <View style={S.historyScores}>
-        {item.players.map(p => (
-          <Text key={p.name} style={S.historyScore}>{p.name}  {p.points} pt{p.points !== 1 ? 's' : ''}</Text>
-        ))}
-      </View>
+      {item.winner ? (
+        <View style={S.historyScores}>
+          <Text style={S.historyScore}>🏆  {item.winner} won</Text>
+        </View>
+      ) : null}
       <Text style={S.historyDate}>{item.date}</Text>
     </View>
   );
@@ -165,8 +160,7 @@ export const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt their own 2 Move Cards.
-        Beginners get easier NOVICE cards. Slip one in at any point during your argument to earn a +1 bonus — no pressure, they're optional.
+        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt 2 cards from the deck: move cards, hazard cards, and counter cards. Beginners get BRONZE tier move cards. Use them strategically — the first to play all their cards wins.
       </Text>
     </View>
     <View style={S.helpRule}>
@@ -179,15 +173,7 @@ export const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>4</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>After each round</Text> — choose to play another round or end the game and score.
-      </Text>
-    </View>
-    <View style={S.helpRule}>
-      <Text style={S.helpRuleNum}>5</Text>
-      <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Score</Text> —{' '}
-        <Text style={{ color: '#FC8181' }}>1 point</Text> for winning the argument.{' '}
-        <Text style={{ color: '#68D391' }}>+1 bonus point</Text> if you actually used your move card.
+        <Text style={{ color: C.gold }}>Win</Text> — be the first to play all your cards. Rounds continue automatically until one player has used every card in their hand. No scoring screen — just play.
       </Text>
     </View>
 
@@ -251,7 +237,7 @@ export const HelpScreen = () => (
 
 // ── Account ────────────────────────────────────────────────────────────────
 
-export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRoundsChange, debateSecs, onDebateSecsChange, cornerTimeEnabled, onCornerTimeChange, history, isOnboarding, myName }) => {
+export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSecsChange, cornerTimeEnabled, onCornerTimeChange, history, isOnboarding, myName }) => {
   const [name, setName] = useState('');
 
   const submit = () => {
@@ -311,28 +297,6 @@ export const AccountScreen = ({ players, onAdd, onRemove, defaultRounds, onRound
 
         <View style={S.sectionDivider} />
         <Text style={S.screenTitle}>SETTINGS</Text>
-
-        <View style={S.settingRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={S.settingLabel}>DEFAULT ROUNDS</Text>
-            <Text style={S.settingSubLabel}>Rounds per game</Text>
-          </View>
-          <View style={S.stepper}>
-            <TouchableOpacity
-              style={S.stepBtn}
-              onPress={() => onRoundsChange(Math.max(1, defaultRounds - 1))}
-            >
-              <Text style={S.stepBtnTxt}>−</Text>
-            </TouchableOpacity>
-            <Text style={S.stepValue}>{defaultRounds}</Text>
-            <TouchableOpacity
-              style={S.stepBtn}
-              onPress={() => onRoundsChange(Math.min(10, defaultRounds + 1))}
-            >
-              <Text style={S.stepBtnTxt}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         <View style={S.settingRow}>
           <View style={{ flex: 1 }}>
@@ -826,12 +790,6 @@ export const DebateScreen = ({
 
         <CaseBanner card={caseCard} />
 
-        <View style={S.scoringHint}>
-          <Text style={S.scoringHintTxt}>
-            ⚔️  1 pt for winning  ·  ⭐ +1 bonus if you use a move card
-          </Text>
-        </View>
-
         {/* Notes / voice */}
         <View style={{ marginTop: 20 }}>
           <View style={{ flexDirection: 'row', marginBottom: 10 }}>
@@ -886,10 +844,10 @@ export const DebateScreen = ({
           )}
         </View>
 
-        {/* Move cards */}
-        {moveCards.length > 0 ? (
+        {/* Cards in hand */}
+        {(moveCards.length > 0 || hazardCards.length > 0) ? (
           <>
-            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>YOUR MOVE CARDS</Text>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>REMAINING CARDS</Text>
             {moveCards.map(card => {
               const selected = selectedMove?.id === card.id;
               const dimmed   = selectedMove !== null && !selected;
@@ -913,41 +871,44 @@ export const DebateScreen = ({
                 </TouchableOpacity>
               );
             })}
+            {hazardCards.length > 0 ? (
+              <>
+                <Text style={{ color: C.muted, fontSize: 12, marginTop: moveCards.length > 0 ? 14 : 0, marginBottom: 10, letterSpacing: 0.3 }}>
+                  Hazard cards restrict your opponent's next turn — play one at the end of your argument.
+                </Text>
+                {hazardCards.map(card => {
+                  const selected = selectedHazard?.id === card.id;
+                  const dimmed   = selectedHazard !== null && !selected;
+                  return (
+                    <TouchableOpacity
+                      key={card.id}
+                      onPress={() => toggleHazard(card)}
+                      activeOpacity={0.88}
+                      style={[
+                        { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                        selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+                        dimmed && { opacity: 0.4 },
+                      ]}
+                    >
+                      <MoveCardView card={card} />
+                      {selected ? (
+                        <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                          <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            ) : null}
           </>
         ) : null}
 
-        {/* Hazard cards — play at end of argument */}
-        {hazardCards.length > 0 ? (
-          <>
-            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>YOUR HAZARD CARDS</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 10, letterSpacing: 0.3 }}>Play one at the end of your argument to restrict your opponent's next turn.</Text>
-            {hazardCards.map(card => {
-              const selected = selectedHazard?.id === card.id;
-              const dimmed   = selectedHazard !== null && !selected;
-              return (
-                <TouchableOpacity
-                  key={card.id}
-                  onPress={() => toggleHazard(card)}
-                  activeOpacity={0.88}
-                  style={[
-                    { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
-                    selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
-                    dimmed && { opacity: 0.4 },
-                  ]}
-                >
-                  <MoveCardView card={card} />
-                  {selected ? (
-                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
-                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
-                    </View>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </>
-        ) : null}
-
-        <Btn label="✓  DONE — I'M FINISHED" onPress={() => setShowModal(true)} style={{ marginTop: 20 }} />
+        <Btn
+          label={nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}` : '✓  DONE'}
+          onPress={() => setShowModal(true)}
+          style={{ marginTop: 20 }}
+        />
 
         {/* Card exchange option */}
         {cards.length > 0 ? (
@@ -964,7 +925,7 @@ export const DebateScreen = ({
             <Text style={S.modalTitle}>{secondsLeft === 0 ? "⏱  TIME'S UP!" : '✓  DONE!'}</Text>
             <Text style={S.modalBody}>
               {nextPlayerName
-                ? `Your argument is on record.\nThe floor passes to ${nextPlayerName}.`
+                ? `Your argument is on record.\nPass the phone to ${nextPlayerName}.`
                 : `${player.name} has spoken.\nThe Parlour awaits your verdict.`}
             </Text>
             {selectedHazard ? (
@@ -1163,9 +1124,9 @@ export const PlayerWinsScreen = ({ winner, onContinue }) => (
     <Text style={[S.screenLabel, { marginBottom: 8 }]}>ALL CARDS PLAYED!</Text>
     <Text style={S.heroTitle}>{winner.name}{'\n'}PLAYED{'\n'}THEM ALL.</Text>
     <Text style={[S.hint, { marginTop: 16 }]}>
-      {winner.name} used every card in their hand.{'\n'}The Parlour demands a verdict.
+      {winner.name} used every card in their hand.{'\n'}Game over.
     </Text>
-    <Btn label="🏆  SCORE THE GAME" onPress={onContinue} style={{ marginTop: 40 }} />
+    <Btn label="FINISH GAME  →" onPress={onContinue} style={{ marginTop: 40 }} />
   </View>
 );
 

@@ -13,22 +13,22 @@ import { S } from './styles';
 import { BottomNav } from './components';
 import {
   HomeScreen, HelpScreen, AccountScreen,
-  PlayerPickScreen, CasePickScreen, CornerTimeScreen, PassScreen, DebateScreen,
+  PlayerPickScreen, CasePickScreen, CornerTimeScreen, DebateScreen,
   CounterWindowScreen, CounterScreen, PlayerWinsScreen,
-  RoundEndScreen, PointsScreen, SoloDojoScreen,
+  SoloDojoScreen,
 } from './screens';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAME FLOWS
 //   new_case – pick_case → [corner_time_p1] → debate_p1
-//              → pass_to_p2 → [counter_window_p2] → [counter_p2]
-//              → [corner_time_p2] → debate_p2 → round_end → [repeat | points]
+//              → [counter_window_p2] → [counter_p2]
+//              → [corner_time_p2] → debate_p2 → [repeat rounds until win]
 //
-//   daily    – pick_players → [corner_time_p1] → debate_p1 → pass_to_p2
-//              → [corner_time_p2] → debate_p2 → round_end → [repeat | points]
+//   daily    – pick_players → [corner_time_p1] → debate_p1
+//              → [corner_time_p2] → debate_p2 → [repeat rounds until win]
 //              (daily uses move cards only — no hazard/counter)
 //
-//   win      – when a player uses all their cards → player_wins → points
+//   win      – when a player uses all their cards → player_wins → home
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function App() {
@@ -41,8 +41,6 @@ export default function App() {
 
   // Persisted across restarts
   const [players, setPlayers] = useState([]);
-  const [defaultRounds, setDefaultRounds] = useState(1);
-
   // Per-game
   const [gamePhase, setGamePhase] = useState('pick_case');
   const [player1, setPlayer1] = useState(null);
@@ -70,8 +68,7 @@ export default function App() {
   const [cornerTimeEnabled, setCornerTimeEnabled] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);
   const [currentP1Move, setCurrentP1Move] = useState(null);
-  const [currentP2Move, setCurrentP2Move] = useState(null);
-  const [roundHistory, setRoundHistory] = useState([]);
+
 
   // In-memory across games
   const [history, setHistory] = useState([]);
@@ -100,7 +97,6 @@ export default function App() {
 
       if (settingsRaw) {
         const s = JSON.parse(settingsRaw);
-        if (s.defaultRounds)              setDefaultRounds(s.defaultRounds);
         if (s.debateSecs)                 setDebateSecs(s.debateSecs);
         if (s.cornerTimeEnabled !== undefined) setCornerTimeEnabled(s.cornerTimeEnabled);
       }
@@ -119,8 +115,8 @@ export default function App() {
 
   useEffect(() => {
     if (!isReady) return;
-    AsyncStorage.setItem('settings', JSON.stringify({ defaultRounds, debateSecs, cornerTimeEnabled })).catch(() => {});
-  }, [defaultRounds, debateSecs, cornerTimeEnabled, isReady]);
+    AsyncStorage.setItem('settings', JSON.stringify({ debateSecs, cornerTimeEnabled })).catch(() => {});
+  }, [debateSecs, cornerTimeEnabled, isReady]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -161,8 +157,7 @@ export default function App() {
     setActiveHazard(null); setActiveCounterCard(null);
     setWinningPlayer(null);
     setCurrentRound(1);
-    setCurrentP1Move(null); setCurrentP2Move(null);
-    setRoundHistory([]);
+    setCurrentP1Move(null);
     setGamePhase(mode === 'new_case' ? 'pick_case' : 'pick_players');
   };
 
@@ -180,9 +175,21 @@ export default function App() {
     setActiveTab('game');
   };
 
+  // ── P2 counter window routing ────────────────────────────────────────────
+  const routeAfterPass = () => {
+    const unusedCounters = p2Cards.filter(
+      c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
+    );
+    if (unusedCounters.length > 0) {
+      setGamePhase('counter_window_p2');
+    } else {
+      setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
+    }
+  };
+
   // ── P1 finishes arguing ──────────────────────────────────────────────────
   const handleP1Done = (moveCard, _note, hazardCard) => {
-    setActiveHazard(null); // clear any hazard that was applied to P1 this turn
+    setActiveHazard(null);
     setCurrentP1Move(moveCard);
 
     const newUsed = [...p1UsedCardIds];
@@ -194,7 +201,7 @@ export default function App() {
     const winner = checkWin(newUsed, p1Cards, player1);
     if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
 
-    setGamePhase('pass_to_p2');
+    routeAfterPass();
   };
 
   // ── P1 exchanges a card ──────────────────────────────────────────────────
@@ -204,19 +211,7 @@ export default function App() {
     if (newCard) {
       setP1Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
     }
-    setGamePhase('pass_to_p2');
-  };
-
-  // ── P2 counter window routing (after pass_to_p2 ready) ───────────────────
-  const routeAfterPass = () => {
-    const unusedCounters = p2Cards.filter(
-      c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
-    );
-    if (unusedCounters.length > 0) {
-      setGamePhase('counter_window_p2');
-    } else {
-      setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
-    }
+    routeAfterPass();
   };
 
   // ── P2 plays counter card ────────────────────────────────────────────────
@@ -236,8 +231,7 @@ export default function App() {
 
   // ── P2 finishes arguing ──────────────────────────────────────────────────
   const handleP2Done = (moveCard, _note, hazardCard) => {
-    setActiveHazard(null); // clear any hazard applied to P2 this turn
-    setCurrentP2Move(moveCard);
+    setActiveHazard(null);
 
     const newUsed = [...p2UsedCardIds];
     if (moveCard)   newUsed.push(moveCard.id);
@@ -248,7 +242,10 @@ export default function App() {
     const winner = checkWin(newUsed, p2Cards, player2);
     if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
 
-    setGamePhase('round_end');
+    setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: moveCard }]);
+    setCurrentRound(r => r + 1);
+    setCurrentP1Move(null);
+    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
   };
 
   // ── P2 exchanges a card ──────────────────────────────────────────────────
@@ -258,27 +255,19 @@ export default function App() {
     if (newCard) {
       setP2Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
     }
-    setGamePhase('round_end');
-  };
-
-  const handleNextRound = () => {
-    setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: currentP2Move }]);
+    setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: null }]);
     setCurrentRound(r => r + 1);
-    setCurrentP1Move(null); setCurrentP2Move(null);
+    setCurrentP1Move(null);
     setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
   };
 
   const handleEndGame = () => {
-    setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: currentP2Move }]);
-    setGamePhase('points');
-  };
-
-  const handleSavePoints = (p1pts, p2pts) => {
     setHistory(h => [{
       id: uid(),
       case: selectedCase.title,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      players: [{ name: player1.name, points: p1pts }, { name: player2.name, points: p2pts }],
+      winner: winningPlayer?.name ?? null,
+      players: [player1.name, player2.name],
     }, ...h]);
     setActiveTab('home');
     resetGame('new_case');
@@ -314,8 +303,6 @@ export default function App() {
         players={players}
         onAdd={handleAddPlayer}
         onRemove={handleRemovePlayer}
-        defaultRounds={defaultRounds}
-        onRoundsChange={setDefaultRounds}
         debateSecs={debateSecs}
         onDebateSecsChange={setDebateSecs}
         cornerTimeEnabled={cornerTimeEnabled}
@@ -386,9 +373,6 @@ export default function App() {
           />
         );
 
-      case 'pass_to_p2':
-        return <PassScreen name={player2?.name} onReady={routeAfterPass} />;
-
       case 'counter_window_p2': {
         const unusedCounters = p2Cards.filter(
           c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
@@ -433,29 +417,6 @@ export default function App() {
           <PlayerWinsScreen
             winner={winningPlayer}
             onContinue={handleEndGame}
-          />
-        );
-
-      case 'round_end':
-        return (
-          <RoundEndScreen
-            currentRound={currentRound}
-            defaultRounds={defaultRounds}
-            player1={player1}
-            player2={player2}
-            onNextRound={handleNextRound}
-            onEndGame={handleEndGame}
-          />
-        );
-
-      case 'points':
-        return (
-          <PointsScreen
-            player1={player1}
-            player2={player2}
-            roundHistory={roundHistory}
-            caseCard={selectedCase}
-            onSave={handleSavePoints}
           />
         );
 
