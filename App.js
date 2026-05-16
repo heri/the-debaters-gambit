@@ -67,7 +67,7 @@ export default function App() {
   const [debateSecs, setDebateSecs] = useState(DEFAULT_DEBATE_SECS);
   const [cornerTimeEnabled, setCornerTimeEnabled] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);
-  const [currentP1Move, setCurrentP1Move] = useState(null);
+
 
 
   // In-memory across games
@@ -157,7 +157,7 @@ export default function App() {
     setActiveHazard(null); setActiveCounterCard(null);
     setWinningPlayer(null);
     setCurrentRound(1);
-    setCurrentP1Move(null);
+
     setGamePhase(mode === 'new_case' ? 'pick_case' : 'pick_players');
   };
 
@@ -190,7 +190,7 @@ export default function App() {
   // ── P1 finishes arguing ──────────────────────────────────────────────────
   const handleP1Done = (moveCard, _note, hazardCard) => {
     setActiveHazard(null);
-    setCurrentP1Move(moveCard);
+
 
     const newUsed = [...p1UsedCardIds];
     if (moveCard)   newUsed.push(moveCard.id);
@@ -242,9 +242,8 @@ export default function App() {
     const winner = checkWin(newUsed, p2Cards, player2);
     if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
 
-    setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: moveCard }]);
     setCurrentRound(r => r + 1);
-    setCurrentP1Move(null);
+
     setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
   };
 
@@ -255,9 +254,8 @@ export default function App() {
     if (newCard) {
       setP2Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
     }
-    setRoundHistory(prev => [...prev, { roundNum: currentRound, p1Move: currentP1Move, p2Move: null }]);
     setCurrentRound(r => r + 1);
-    setCurrentP1Move(null);
+
     setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
   };
 

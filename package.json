@@ -13,8 +13,10 @@
     "expo": "~54.0.34",
     "expo-status-bar": "~2.2.3",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-safe-area-context": "^5.7.0"
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-web": "^0.21.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
@@ -33,6 +35,8 @@
     "moduleNameMapper": {
       "^react-native$": "<rootDir>/__mocks__/react-native.js"
     },
-    "testPathIgnorePatterns": ["/node_modules/"]
+    "testPathIgnorePatterns": [
+      "/node_modules/"
+    ]
   }
 }
