@@ -188,9 +188,9 @@ export default function App() {
   };
 
   // ── P1 finishes arguing ──────────────────────────────────────────────────
-  const handleP1Done = (moveCard, _note, hazardCard) => {
+  const handleP1Done = (moveCard, _note, hazardCard, hazardFollowed) => {
+    const prevHazard = activeHazard;
     setActiveHazard(null);
-
 
     const newUsed = [...p1UsedCardIds];
     if (moveCard)   newUsed.push(moveCard.id);
@@ -198,7 +198,14 @@ export default function App() {
     setP1UsedCardIds(newUsed);
     if (hazardCard) setActiveHazard(hazardCard);
 
-    const winner = checkWin(newUsed, p1Cards, player1);
+    // Hazard penalty: if the active hazard wasn't followed, deal an extra card
+    let updatedHand = p1Cards;
+    if (prevHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, p1Cards.map(c => c.id));
+      if (penalty) { updatedHand = [...p1Cards, penalty]; setP1Cards(updatedHand); }
+    }
+
+    const winner = checkWin(newUsed, updatedHand, player1);
     if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
 
     routeAfterPass();
@@ -230,7 +237,8 @@ export default function App() {
   };
 
   // ── P2 finishes arguing ──────────────────────────────────────────────────
-  const handleP2Done = (moveCard, _note, hazardCard) => {
+  const handleP2Done = (moveCard, _note, hazardCard, hazardFollowed) => {
+    const prevHazard = activeHazard;
     setActiveHazard(null);
 
     const newUsed = [...p2UsedCardIds];
@@ -239,7 +247,14 @@ export default function App() {
     setP2UsedCardIds(newUsed);
     if (hazardCard) setActiveHazard(hazardCard);
 
-    const winner = checkWin(newUsed, p2Cards, player2);
+    // Hazard penalty: if the active hazard wasn't followed, deal an extra card
+    let updatedHand = p2Cards;
+    if (prevHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, p2Cards.map(c => c.id));
+      if (penalty) { updatedHand = [...p2Cards, penalty]; setP2Cards(updatedHand); }
+    }
+
+    const winner = checkWin(newUsed, updatedHand, player2);
     if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
 
     setCurrentRound(r => r + 1);

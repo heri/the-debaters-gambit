@@ -693,7 +693,7 @@ export const CornerTimeScreen = ({ player, cards = [], moves, onReady }) => {
 // cards: Card[] — each player's own 2 dealt cards (move / hazard / counter mix)
 // activeHazard: Card | null — hazard played by opponent; restricts this player's turn
 // debateSecs: total seconds for this player's turn (configurable from Account)
-// onDone(moveCard, noteText, hazardCard) — move and hazard used this turn
+// onDone(moveCard, noteText, hazardCard, hazardFollowed) — move/hazard used + whether the active hazard restriction was met
 // onExchange(card) — player exchanges a card instead of playing one
 
 export const DebateScreen = ({
@@ -714,6 +714,7 @@ export const DebateScreen = ({
   const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
   const [selectedMove,   setSelectedMove]   = useState(null);
   const [selectedHazard, setSelectedHazard] = useState(null);
+  const [hazardFollowed, setHazardFollowed] = useState(false);
   const [showModal,      setShowModal]      = useState(false);
   const [showExchange,   setShowExchange]   = useState(false);
   const [exchangeCard,   setExchangeCard]   = useState(null);
@@ -779,13 +780,31 @@ export const DebateScreen = ({
           State your case,{'\n'}{player.name}
         </Text>
 
-        {/* Active hazard restriction banner */}
+        {/* Active hazard restriction banner + compliance confirm */}
         {activeHazard ? (
-          <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 14 }}>
-            <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
-            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
-            <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
-          </View>
+          <>
+            <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 10 }}>
+              <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
+              <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
+              <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setHazardFollowed(prev => !prev)}
+              activeOpacity={0.8}
+              style={{
+                borderRadius: 12, borderWidth: 2,
+                borderColor: hazardFollowed ? '#4ADE80' : '#6B7280',
+                backgroundColor: hazardFollowed ? '#071A07' : C.surface,
+                padding: 12, marginBottom: 14,
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>{hazardFollowed ? '✅' : '☐'}</Text>
+              <Text style={{ color: hazardFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+                {hazardFollowed ? 'HAZARD FOLLOWED' : 'TAP TO CONFIRM: I FOLLOWED THE HAZARD'}
+              </Text>
+            </TouchableOpacity>
+          </>
         ) : null}
 
         <CaseBanner card={caseCard} />
@@ -934,9 +953,16 @@ export const DebateScreen = ({
                 <Text style={{ color: '#E8DFC8', fontWeight: '700', marginTop: 2 }}>{selectedHazard.name}</Text>
               </View>
             ) : null}
+            {activeHazard && !hazardFollowed ? (
+              <View style={{ backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10, marginBottom: 14 }}>
+                <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+                  ⚠️ Hazard not confirmed — one extra card will be added to your hand.
+                </Text>
+              </View>
+            ) : null}
             <Btn
               label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
-              onPress={() => onDone(selectedMove, savedNoteRef.current, selectedHazard)}
+              onPress={() => onDone(selectedMove, savedNoteRef.current, selectedHazard, hazardFollowed)}
             />
           </View>
         </View>

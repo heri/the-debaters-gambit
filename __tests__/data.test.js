@@ -4,8 +4,13 @@ import {
   uid,
   getDailyDraw,
   dealMoveCards,
+  dealCards,
+  drawOneCard,
   MOVE_CARDS,
   CASE_CARDS,
+  HAZARD_CARDS,
+  COUNTER_CARDS,
+  ALL_PLAY_CARDS,
   NAV_TABS,
   sortedCases,
   DEFAULT_DEBATE_SECS,
@@ -224,6 +229,147 @@ describe('dealMoveCards', () => {
       const p2Ids = all4.slice(2, 4).map(c => c.id);
       p2Ids.forEach(id => expect(p1Ids.has(id)).toBe(false));
     }
+  });
+});
+
+// ── dealCards ─────────────────────────────────────────────────────────────
+
+describe('dealCards', () => {
+  test('returns exactly 2 cards by default', () => {
+    expect(dealCards(0)).toHaveLength(2);
+    expect(dealCards(100)).toHaveLength(2);
+  });
+  test('count=4 returns exactly 4 cards', () => {
+    expect(dealCards(0, 4)).toHaveLength(4);
+  });
+  test('all returned cards exist in ALL_PLAY_CARDS', () => {
+    const validIds = new Set(ALL_PLAY_CARDS.map(c => c.id));
+    for (let i = 0; i < 20; i++) {
+      dealCards(0).forEach(c => expect(validIds.has(c.id)).toBe(true));
+      dealCards(50).forEach(c => expect(validIds.has(c.id)).toBe(true));
+    }
+  });
+  test('no duplicate card IDs in a single deal', () => {
+    for (let i = 0; i < 30; i++) {
+      const ids = dealCards(0, 4).map(c => c.id);
+      expect(new Set(ids).size).toBe(4);
+    }
+  });
+  test('move cards are BRONZE-only when history < 10', () => {
+    for (let h = 0; h <= 9; h++) {
+      const cards = dealCards(h, 4);
+      const moveCards = cards.filter(c => c.cardType === 'move');
+      expect(moveCards.every(c => c.tier === 'BRONZE')).toBe(true);
+    }
+  });
+  test('each card has cardType field', () => {
+    dealCards(0, 4).forEach(c => {
+      expect(['move', 'hazard', 'counter']).toContain(c.cardType);
+    });
+  });
+  test('does not mutate source arrays', () => {
+    const movLen = MOVE_CARDS.length;
+    const hazLen = HAZARD_CARDS.length;
+    const ctrLen = COUNTER_CARDS.length;
+    dealCards(0, 4);
+    expect(MOVE_CARDS).toHaveLength(movLen);
+    expect(HAZARD_CARDS).toHaveLength(hazLen);
+    expect(COUNTER_CARDS).toHaveLength(ctrLen);
+  });
+});
+
+// ── drawOneCard ────────────────────────────────────────────────────────────
+
+describe('drawOneCard', () => {
+  test('returns a card object', () => {
+    const card = drawOneCard(0);
+    expect(card).not.toBeNull();
+    expect(card).toHaveProperty('id');
+    expect(card).toHaveProperty('cardType');
+  });
+  test('returned card is in ALL_PLAY_CARDS', () => {
+    const validIds = new Set(ALL_PLAY_CARDS.map(c => c.id));
+    for (let i = 0; i < 20; i++) {
+      const card = drawOneCard(0);
+      expect(validIds.has(card.id)).toBe(true);
+    }
+  });
+  test('never returns a card whose id is in excludeIds', () => {
+    const exclude = ALL_PLAY_CARDS.slice(0, ALL_PLAY_CARDS.length - 1).map(c => c.id);
+    for (let i = 0; i < 20; i++) {
+      const card = drawOneCard(100, exclude);
+      expect(exclude).not.toContain(card.id);
+    }
+  });
+  test('returns null when the entire pool is excluded', () => {
+    const allIds = ALL_PLAY_CARDS.map(c => c.id);
+    expect(drawOneCard(0, allIds)).toBeNull();
+  });
+});
+
+// ── HAZARD_CARDS integrity ─────────────────────────────────────────────────
+
+describe('HAZARD_CARDS integrity', () => {
+  const REQUIRED_FIELDS = ['id', 'name', 'icon', 'bg', 'accent', 'what', 'hint', 'status'];
+
+  test('array is non-empty', () => {
+    expect(HAZARD_CARDS.length).toBeGreaterThan(0);
+  });
+  test('every card has cardType "hazard"', () => {
+    HAZARD_CARDS.forEach(c => expect(c.cardType).toBe('hazard'));
+  });
+  test('every card has all required fields', () => {
+    HAZARD_CARDS.forEach(card => {
+      REQUIRED_FIELDS.forEach(field => expect(card[field]).toBeTruthy());
+    });
+  });
+  test('all IDs are unique and do not overlap with MOVE_CARDS', () => {
+    const ids = HAZARD_CARDS.map(c => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const moveIds = new Set(MOVE_CARDS.map(c => c.id));
+    ids.forEach(id => expect(moveIds.has(id)).toBe(false));
+  });
+  test('restrictDebateSecs is a positive number when present', () => {
+    HAZARD_CARDS.filter(c => c.restrictDebateSecs !== undefined).forEach(c => {
+      expect(typeof c.restrictDebateSecs).toBe('number');
+      expect(c.restrictDebateSecs).toBeGreaterThan(0);
+    });
+  });
+});
+
+// ── COUNTER_CARDS integrity ────────────────────────────────────────────────
+
+describe('COUNTER_CARDS integrity', () => {
+  const REQUIRED_FIELDS = ['id', 'name', 'icon', 'bg', 'accent', 'what', 'hint', 'status'];
+
+  test('array is non-empty', () => {
+    expect(COUNTER_CARDS.length).toBeGreaterThan(0);
+  });
+  test('every card has cardType "counter"', () => {
+    COUNTER_CARDS.forEach(c => expect(c.cardType).toBe('counter'));
+  });
+  test('every card has all required fields', () => {
+    COUNTER_CARDS.forEach(card => {
+      REQUIRED_FIELDS.forEach(field => expect(card[field]).toBeTruthy());
+    });
+  });
+  test('all IDs are unique and do not overlap with MOVE_CARDS or HAZARD_CARDS', () => {
+    const ids = COUNTER_CARDS.map(c => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const otherIds = new Set([...MOVE_CARDS, ...HAZARD_CARDS].map(c => c.id));
+    ids.forEach(id => expect(otherIds.has(id)).toBe(false));
+  });
+});
+
+// ── ALL_PLAY_CARDS integrity ───────────────────────────────────────────────
+
+describe('ALL_PLAY_CARDS', () => {
+  test('contains all move, hazard, and counter cards', () => {
+    expect(ALL_PLAY_CARDS.length).toBe(MOVE_CARDS.length + HAZARD_CARDS.length + COUNTER_CARDS.length);
+  });
+  test('all IDs are unique', () => {
+    const ids = ALL_PLAY_CARDS.map(c => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 

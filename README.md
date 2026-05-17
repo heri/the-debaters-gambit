@@ -8,24 +8,19 @@ A mobile card game for sharpening debate and rhetoric skills — built for a par
 
 ## What is it?
 
-Two players. One case. A hand of move cards.
+Two players. One case. A hand of cards.
 
-A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superheroes would make terrible teachers") to hard philosophical clashes ("A world of magic would be worse than a world of technology"). Each player is **dealt their own 2 Move Cards** — rhetorical techniques they can slip in at any point during their argument to earn a bonus point. Tell a humble folktale, paint a vision of the future, find common ground, or bluff with absolute confidence. They're suggestions, not requirements.
+A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superheroes would make terrible teachers") to hard philosophical clashes ("A world of magic would be worse than a world of technology"). Each player is **dealt their own 2 cards** from a mixed deck: **Move Cards** (rhetorical techniques), **Hazard Cards** (restrictions you play against your opponent), and **Counter Cards** (interrupt moves after your opponent argues).
 
-Each player's turn is timed by a depleting progress bar. Points are awarded — 1 for winning the argument, and a +1 bonus if they actually used a move card. Over time, the card pool expands from Bronze to Gold tier as players build real-world persuasion and storytelling skills.
+Each player's turn is timed by a depleting progress bar. The first player to **use all their cards wins** — no point scoring, no voting. Over time, the card pool expands from Bronze to Gold tier as players build real-world persuasion and storytelling skills.
 
 The app treats players as **junior debaters, not students** — members of the *Parlour of Minds*. Not here to learn. Here to practise.
 
 ---
 
-## Scoring
+## Win Condition
 
-| Action | Points |
-|---|---|
-| Won the argument | +1 pt |
-| Used a move card | +1 bonus pt |
-
-Maximum 2 points per player per round.
+The first player to play every card in their starting hand wins. Rounds continue automatically until that happens. If an opponent plays a **Hazard Card** against you and you can't follow its restriction, you're dealt an extra card as a penalty — making it harder to win.
 
 ---
 
@@ -35,12 +30,18 @@ Maximum 2 points per player per round.
 A pre-generated daily pairing — one Case Card and one Move Card of the Day — seeded from the date so it's identical for everyone. No browsing, no choosing. Tap **▶ Play Today's Round** and debate immediately. Foundation for the streak mechanic coming in V2.
 
 ### ⚔️ New Case (bottom nav)
-Full custom game. Browse and pick a case + players in one screen, each player gets their own 2 random move cards, play as many rounds as you want.
+Full custom game. Browse and pick a case + players in one screen. Each player is dealt **2 cards** from the combined pool (move + hazard + counter). Game ends when one player uses all their cards.
 
-**Move card dealing rules:**
-- Fewer than 10 rounds in history → always dealt **NOVICE (Bronze)** cards
-- 10+ rounds → dealt from the full card pool (Bronze, Silver, Gold)
-- P1 and P2 always receive different cards (dealt like poker/UNO — no sharing)
+**Card dealing rules:**
+- Fewer than 10 games in history → move cards are always **BRONZE (Novice)** tier
+- 10+ games → move cards dealt from the full pool (Bronze, Silver, Gold)
+- Hazard and Counter cards are always available regardless of history
+- P1 and P2 always receive different cards
+
+**Card types:**
+- **Move Cards** — rhetorical techniques (The Fair Play, The Honest Tale, etc.). Select one during your argument turn to use it.
+- **Hazard Cards** — play at the end of your argument to restrict your opponent's next turn (e.g. "No Numbers", "One Sentence"). If the opponent can't follow the restriction, they're dealt an extra penalty card.
+- **Counter Cards** — interrupt moves shown in a 10-second window after P1 argues; P2 can play one before their own turn begins.
 
 ### 🦊 Solo Dojo (bottom nav)
 Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill move cards alone through a 5-step interactive arc:
@@ -112,33 +113,25 @@ Daily Quick Draw →
   1. Tap "▶ Play Today's Round"
   2. Choose 2 players (PlayerPickScreen)
   3. [Corner Time — "Prepare your case, [Name]" shown; 60s to plan, if enabled]
-  4. DEBATE — "State your case, [Name]"; progress bar depletes; P1 debates
-     - Jot notes (text tab) or record yourself (voice tab, requires expo-av)
-     - Tap a move card to mark it as used (+1 bonus)
-     - "Done — I'm Finished" ends the turn early (auto-saves notes if time lapses)
-  5. Pass phone to P2 (privacy cover screen)
-  6. [Corner Time — 60s for P2, if enabled]
-  7. P2 debates with their move card
-  8. After each round: "Next Round" or "End Game & Score"
-  9. SCORE — reveal move cards used, award points
+  4. DEBATE — progress bar depletes; P1 debates
+     - Jot notes or record voice
+     - Select a move card from "REMAINING CARDS" to use it this turn
+     - "→ PASS TO [NAME]" button ends the turn
+  5. Done modal: "Pass the phone to [P2]" — P2 receives the phone
+  6. [Counter Window — 10s for P2 to play a counter card if they have one]
+  7. [Corner Time — 60s for P2, if enabled]
+  8. P2 debates; if a hazard was active, P2 sees a confirmation toggle
+     — "TAP TO CONFIRM: I FOLLOWED THE HAZARD"
+     — if P2 skips confirmation, an extra card is dealt to P2's hand automatically
+  9. Rounds continue automatically until one player uses all their cards
+  10. Win screen — "FINISH GAME →" saves result and returns home
 
 ⚔️  New Case →
   1. Browse case cards (sorted Easy → Hard, swipe or arrow)
      — or tap 🎲 Random ("🦊 Argus chooses...")
   2. Select Player 1 and Player 2 from inline dropdowns
-     (Player 1 speaks first, then Player 2)
-  3. Tap "Choose This Case" — each player is dealt their own 2 unique move cards
-  4. [Corner Time — "Prepare your case, [Name]"; 60s for P1, if enabled]
-  5. DEBATE — "State your case, [Name]"; progress bar depletes as time runs out
-     - Case description always visible
-     - Jot notes (text tab) or record yourself (voice tab, requires expo-av)
-     - Your move cards shown — tap one to mark it as used (+1 bonus if you use a move card)
-     - "Done — I'm Finished" ends the turn early (text notes auto-saved if time lapses)
-  6. Pass phone to P2 (privacy cover screen)
-  7. [Corner Time — 60s for P2, if enabled]
-  8. P2 debates with their own different move cards
-  9. After each round: "Next Round" or "End Game & Score"
-  10. SCORE — reveal chosen move cards, award points, save to history
+  3. Tap "Choose This Case" — each player dealt 2 cards (move/hazard/counter mix)
+  4–10. Same flow as Daily Quick Draw above
 
 🦊  Solo Dojo →
   1. Pick any unlocked move card from the list
@@ -152,7 +145,6 @@ Daily Quick Draw →
 
 | Setting | Default | Description |
 |---|---|---|
-| Default Rounds | 1 | Rounds per game (1–10) |
 | Debate Time | 5 min | Player turn duration (1–15 min) |
 | Corner Time | ON | 60s planning window before each debate turn |
 
@@ -218,13 +210,13 @@ The game speaks like a sparring partner, not a teacher.
 
 ```
 App.js          ← state machine + AsyncStorage (players, settings, completedDrills)
-cards.js        ← MOVE_CARDS + CASE_CARDS (content: what, hint, status fields)
-data.js         ← constants, utilities, getDailyDraw(), dealMoveCards(); re-exports cards
+cards.js        ← MOVE_CARDS + CASE_CARDS + HAZARD_CARDS + COUNTER_CARDS
+data.js         ← constants, utilities, getDailyDraw(), dealCards(), drawOneCard(); re-exports cards
 drills.js       ← DRILLS (5-step Bronze) + DRILLS_LEGACY (2-step Silver/Gold) for Solo Dojo
 styles.js       ← design tokens (C) + StyleSheet (S) — Ink & Spark palette
-components.js   ← Btn, CardBrowser, MovePickRow, BottomNav, card views
+components.js   ← Btn, CardBrowser, MovePickRow, BottomNav, card views (MoveCardView handles all cardTypes)
 screens.js      ← all screens (Home, Help, Account, PlayerPick, CasePick, CornerTime,
-                   Pass, Debate, RoundEnd, Points, SoloDojo)
+                   Debate, CounterWindow, Counter, PlayerWins, SoloDojo)
 app.json        ← Expo + EAS config; icon = argus_main_icon.png
 argus_main_icon.png   ← shield crest icon (app icon + dojo drill bubble)
 argus_confident.png   ← single confident fox (Solo Dojo header + Corner Time)
@@ -261,6 +253,6 @@ eas submit --platform ios
 
 ## Roadmap
 
-- **V1 (current)** — local pass-and-play, daily quick draw, inline case/player picker, Corner Time (personalised headings), text/voice notes during debate, depleting progress bar, configurable debate time, each player's own move cards, multi-round, scoring, Win/Loss/Draw history (Home + Account), Solo Dojo with Argus (5-step Bronze drills), AsyncStorage persistence, Ink & Spark design direction
+- **V1 (current)** — local pass-and-play, daily quick draw, inline case/player picker, Corner Time (personalised headings), text/voice notes during debate, depleting progress bar, configurable debate time, mixed-deck dealing (move/hazard/counter), hazard compliance mechanic (penalty card if not followed), counter window (10s interrupt), win-by-cards mechanic, game history (Home + Account), Solo Dojo with Argus (5-step Bronze drills), AsyncStorage persistence, Ink & Spark design direction
 - **V2** — daily streak counter, audio transcription (Apple Speech framework), LLM judge (Gemini Flash), structured verdict (winner + witty breakdown + feedback)
 - **V3** — player accounts, match history, remote multiplayer, card deck OTA updates via Firebase/Supabase
