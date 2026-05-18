@@ -1,6 +1,6 @@
-// The Debater's Gambit — v5.0
+// The Debater's Gambit — v6.0
 // App.js is the state machine and persistence layer only.
-// Card data → data.js  |  Styles → styles.js  |  Components → components.js  |  Screens → screens.js
+// Card data → cards.js  |  Styles → styles.js  |  Components → components.js  |  Screens → screens.js
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { View } from 'react-native';
@@ -14,21 +14,35 @@ import { BottomNav } from './components';
 import {
   HomeScreen, HelpScreen, AccountScreen,
   PlayerPickScreen, CasePickScreen, CornerTimeScreen, DebateScreen,
-  CounterWindowScreen, CounterScreen, PlayerWinsScreen,
+  HazardWindowScreen, CounterWindowScreen, CounterScreen,
+  ComebackScreen, ExchangeScreen, PlayerWinsScreen,
   SoloDojoScreen,
 } from './screens';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GAME FLOWS
-//   new_case – pick_case → [corner_time_p1] → debate_p1
-//              → [counter_window_p2] → [counter_p2]
-//              → [corner_time_p2] → debate_p2 → [repeat rounds until win]
+// GAME FLOW (new_case)
 //
-//   daily    – pick_players → [corner_time_p1] → debate_p1
-//              → [corner_time_p2] → debate_p2 → [repeat rounds until win]
-//              (daily uses move cards only — no hazard/counter)
+//   pick_case
+//   → hazard_window_for_p1   (P2 plays hazard against P1, or skips)
+//   → [corner_time_p1]
+//   → debate_p1
+//   → counter_window_p2      (P2 has 15s to play counter, or skip)
+//   → [counter_p2]
+//   → [comeback_p1]          (only if counter played)
+//   → exchange_p1
+//   → [win check: if P2 has 0 cards → P2 wins]
+//   → hazard_window_for_p2   (P1 plays hazard against P2, or skips)
+//   → [corner_time_p2]
+//   → debate_p2
+//   → counter_window_p1      (P1 has 15s, or skip)
+//   → [counter_p1]
+//   → [comeback_p2]
+//   → exchange_p2
+//   → [win check: if P1 has 0 cards → P1 wins]
+//   → hazard_window_for_p1   (repeat)
 //
-//   win      – when a player uses all their cards → player_wins → home
+// GAME FLOW (daily) — simplified, move cards only:
+//   pick_players → [corner_time_p1] → debate_p1 → [corner_time_p2] → debate_p2 → repeat
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function App() {
@@ -41,42 +55,36 @@ export default function App() {
 
   // Persisted across restarts
   const [players, setPlayers] = useState([]);
-  // Per-game
+
+  // Game state
+  const [gameMode, setGameMode] = useState('new_case'); // 'new_case' | 'daily'
   const [gamePhase, setGamePhase] = useState('pick_case');
   const [player1, setPlayer1] = useState(null);
   const [player2, setPlayer2] = useState(null);
   const [selectedCase, setSelectedCase] = useState(null);
 
-  // Each player's full hand: mix of move / hazard / counter cards
-  const [p1Cards, setP1Cards] = useState([]);
-  const [p2Cards, setP2Cards] = useState([]);
+  // Each player's live hand (cards are removed when played)
+  const [p1Hand, setP1Hand] = useState([]);
+  const [p2Hand, setP2Hand] = useState([]);
 
-  // Track which card IDs have been used (played or played as counter/hazard)
-  const [p1UsedCardIds, setP1UsedCardIds] = useState([]);
-  const [p2UsedCardIds, setP2UsedCardIds] = useState([]);
+  // Once-per-game burn tracking
+  const [p1HasBurned, setP1HasBurned] = useState(false);
+  const [p2HasBurned, setP2HasBurned] = useState(false);
 
-  // Hazard card currently applied to the next player's debate turn
+  // Active hazard / counter for the current turn
   const [activeHazard, setActiveHazard] = useState(null);
-
-  // Counter card selected during counter window
   const [activeCounterCard, setActiveCounterCard] = useState(null);
 
-  // Player who used all their cards
+  // Winner
   const [winningPlayer, setWinningPlayer] = useState(null);
 
   const [debateSecs, setDebateSecs] = useState(DEFAULT_DEBATE_SECS);
   const [cornerTimeEnabled, setCornerTimeEnabled] = useState(true);
   const [currentRound, setCurrentRound] = useState(1);
 
-
-
-  // In-memory across games
   const [history, setHistory] = useState([]);
-
-  // Solo Dojo — persisted list of completed card IDs
   const [completedDrills, setCompletedDrills] = useState([]);
 
-  // Daily draw is stable for the session (date doesn't change mid-game)
   const dailyDraw = useMemo(() => getDailyDraw(), []);
 
   // ── Load from AsyncStorage on mount ─────────────────────────────────────
@@ -97,7 +105,7 @@ export default function App() {
 
       if (settingsRaw) {
         const s = JSON.parse(settingsRaw);
-        if (s.debateSecs)                 setDebateSecs(s.debateSecs);
+        if (s.debateSecs)                      setDebateSecs(s.debateSecs);
         if (s.cornerTimeEnabled !== undefined) setCornerTimeEnabled(s.cornerTimeEnabled);
       }
 
@@ -107,7 +115,7 @@ export default function App() {
     }).catch(() => setIsReady(true));
   }, []);
 
-  // ── Persist whenever data changes (skip before initial load) ─────────────
+  // ── Persistence ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isReady) return;
     AsyncStorage.setItem('players', JSON.stringify(players)).catch(() => {});
@@ -142,22 +150,15 @@ export default function App() {
     }
   };
 
-  // ── Win condition check ──────────────────────────────────────────────────
-  // Returns the winning player object if they've used all their cards, else null.
-  const checkWin = (usedIds, hand, player) => {
-    if (hand.length > 0 && usedIds.length >= hand.length) return player;
-    return null;
-  };
-
   // ── Game management ──────────────────────────────────────────────────────
   const resetGame = (mode = 'new_case') => {
+    setGameMode(mode);
     setPlayer1(null); setPlayer2(null); setSelectedCase(null);
-    setP1Cards([]); setP2Cards([]);
-    setP1UsedCardIds([]); setP2UsedCardIds([]);
+    setP1Hand([]); setP2Hand([]);
+    setP1HasBurned(false); setP2HasBurned(false);
     setActiveHazard(null); setActiveCounterCard(null);
     setWinningPlayer(null);
     setCurrentRound(1);
-
     setGamePhase(mode === 'new_case' ? 'pick_case' : 'pick_players');
   };
 
@@ -169,109 +170,9 @@ export default function App() {
   const handlePlayDaily = () => {
     resetGame('daily');
     setSelectedCase(dailyDraw.caseCard);
-    // Daily mode: move cards only (one each, shared card is fine for quick draw)
-    setP1Cards([dailyDraw.moveCard]);
-    setP2Cards([dailyDraw.moveCard]);
+    setP1Hand([dailyDraw.moveCard]);
+    setP2Hand([dailyDraw.moveCard]);
     setActiveTab('game');
-  };
-
-  // ── P2 counter window routing ────────────────────────────────────────────
-  const routeAfterPass = () => {
-    const unusedCounters = p2Cards.filter(
-      c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
-    );
-    if (unusedCounters.length > 0) {
-      setGamePhase('counter_window_p2');
-    } else {
-      setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
-    }
-  };
-
-  // ── P1 finishes arguing ──────────────────────────────────────────────────
-  const handleP1Done = (moveCard, _note, hazardCard, hazardFollowed) => {
-    const prevHazard = activeHazard;
-    setActiveHazard(null);
-
-    const newUsed = [...p1UsedCardIds];
-    if (moveCard)   newUsed.push(moveCard.id);
-    if (hazardCard) newUsed.push(hazardCard.id);
-    setP1UsedCardIds(newUsed);
-    if (hazardCard) setActiveHazard(hazardCard);
-
-    // Hazard penalty: if the active hazard wasn't followed, deal an extra card
-    let updatedHand = p1Cards;
-    if (prevHazard && !hazardFollowed) {
-      const penalty = drawOneCard(history.length, p1Cards.map(c => c.id));
-      if (penalty) { updatedHand = [...p1Cards, penalty]; setP1Cards(updatedHand); }
-    }
-
-    const winner = checkWin(newUsed, updatedHand, player1);
-    if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
-
-    routeAfterPass();
-  };
-
-  // ── P1 exchanges a card ──────────────────────────────────────────────────
-  const handleP1Exchange = (cardToDiscard) => {
-    const allIds = p1Cards.map(c => c.id);
-    const newCard = drawOneCard(history.length, allIds);
-    if (newCard) {
-      setP1Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
-    }
-    routeAfterPass();
-  };
-
-  // ── P2 plays counter card ────────────────────────────────────────────────
-  const handleP2CounterPlay = (card) => {
-    setActiveCounterCard(card);
-    const newUsed = [...p2UsedCardIds, card.id];
-    setP2UsedCardIds(newUsed);
-    // Check win before counter screen (unlikely but consistent)
-    const winner = checkWin(newUsed, p2Cards, player2);
-    if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
-    setGamePhase('counter_p2');
-  };
-
-  const handleP2CounterDone = () => {
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
-  };
-
-  // ── P2 finishes arguing ──────────────────────────────────────────────────
-  const handleP2Done = (moveCard, _note, hazardCard, hazardFollowed) => {
-    const prevHazard = activeHazard;
-    setActiveHazard(null);
-
-    const newUsed = [...p2UsedCardIds];
-    if (moveCard)   newUsed.push(moveCard.id);
-    if (hazardCard) newUsed.push(hazardCard.id);
-    setP2UsedCardIds(newUsed);
-    if (hazardCard) setActiveHazard(hazardCard);
-
-    // Hazard penalty: if the active hazard wasn't followed, deal an extra card
-    let updatedHand = p2Cards;
-    if (prevHazard && !hazardFollowed) {
-      const penalty = drawOneCard(history.length, p2Cards.map(c => c.id));
-      if (penalty) { updatedHand = [...p2Cards, penalty]; setP2Cards(updatedHand); }
-    }
-
-    const winner = checkWin(newUsed, updatedHand, player2);
-    if (winner) { setWinningPlayer(winner); setGamePhase('player_wins'); return; }
-
-    setCurrentRound(r => r + 1);
-
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
-  };
-
-  // ── P2 exchanges a card ──────────────────────────────────────────────────
-  const handleP2Exchange = (cardToDiscard) => {
-    const allIds = p2Cards.map(c => c.id);
-    const newCard = drawOneCard(history.length, allIds);
-    if (newCard) {
-      setP2Cards(prev => prev.map(c => c.id === cardToDiscard.id ? newCard : c));
-    }
-    setCurrentRound(r => r + 1);
-
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
   };
 
   const handleEndGame = () => {
@@ -286,7 +187,162 @@ export default function App() {
     resetGame('new_case');
   };
 
-  // ── Splash while AsyncStorage loads ─────────────────────────────────────
+  // ── Win check ────────────────────────────────────────────────────────────
+  // Called after exchange_p1 to see if P2 starts their turn with 0 cards,
+  // or after exchange_p2 to see if P1 starts their turn with 0 cards.
+  const checkWinAndRoute = (nextPlayer, nextPlayerHand, nextPhase) => {
+    if (nextPlayerHand.length === 0) {
+      setWinningPlayer(nextPlayer);
+      setGamePhase('player_wins');
+    } else {
+      setGamePhase(nextPhase);
+    }
+  };
+
+  // ── Hazard Window handlers ────────────────────────────────────────────────
+
+  // P2 played (or skipped) hazard before P1's turn
+  const handleHazardForP1 = (hazardCard) => {
+    if (hazardCard) {
+      setP2Hand(prev => prev.filter(c => c.id !== hazardCard.id));
+      setActiveHazard(hazardCard);
+    } else {
+      setActiveHazard(null);
+    }
+    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
+  };
+
+  // P1 played (or skipped) hazard before P2's turn
+  const handleHazardForP2 = (hazardCard) => {
+    if (hazardCard) {
+      setP1Hand(prev => prev.filter(c => c.id !== hazardCard.id));
+      setActiveHazard(hazardCard);
+    } else {
+      setActiveHazard(null);
+    }
+    setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
+  };
+
+  // ── P1 debate handlers ────────────────────────────────────────────────────
+
+  const handleP1Done = (moveCard, hazardFollowed) => {
+    const prevHazard = activeHazard;
+    setActiveHazard(null);
+
+    let newHand = moveCard ? p1Hand.filter(c => c.id !== moveCard.id) : p1Hand;
+
+    // Penalty: if hazard was active and not followed → draw an extra card
+    if (prevHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, newHand.map(c => c.id));
+      if (penalty) newHand = [...newHand, penalty];
+    }
+    setP1Hand(newHand);
+
+    // Route to counter window if P2 has unused counter cards
+    const unusedCounters = p2Hand.filter(c => c.cardType === 'counter');
+    if (unusedCounters.length > 0) {
+      setGamePhase('counter_window_p2');
+    } else {
+      setGamePhase('exchange_p1');
+    }
+  };
+
+  const handleP2CounterPlay = (card) => {
+    setActiveCounterCard(card);
+    setP2Hand(prev => prev.filter(c => c.id !== card.id));
+    setGamePhase('counter_p2');
+  };
+
+  const handleP2CounterDone = () => {
+    setGamePhase('comeback_p1');
+  };
+
+  const handleComebackP1Done = (moveCard) => {
+    if (moveCard) setP1Hand(prev => prev.filter(c => c.id !== moveCard.id));
+    setActiveCounterCard(null);
+    setGamePhase('exchange_p1');
+  };
+
+  const handleExchangeP1Done = (action, card) => {
+    if (action === 'exchange' && card) {
+      const allIds = p1Hand.map(c => c.id);
+      const newCard = drawOneCard(history.length, allIds);
+      if (newCard) setP1Hand(prev => prev.map(c => c.id === card.id ? newCard : c));
+    } else if (action === 'burn' && card) {
+      setP1Hand(prev => prev.filter(c => c.id !== card.id));
+      setP1HasBurned(true);
+    }
+    // Check if P2 starts their turn with 0 cards
+    checkWinAndRoute(player2, p2Hand, 'hazard_window_for_p2');
+  };
+
+  // ── P2 debate handlers ────────────────────────────────────────────────────
+
+  const handleP2Done = (moveCard, hazardFollowed) => {
+    const prevHazard = activeHazard;
+    setActiveHazard(null);
+
+    let newHand = moveCard ? p2Hand.filter(c => c.id !== moveCard.id) : p2Hand;
+
+    if (prevHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, newHand.map(c => c.id));
+      if (penalty) newHand = [...newHand, penalty];
+    }
+    setP2Hand(newHand);
+
+    const unusedCounters = p1Hand.filter(c => c.cardType === 'counter');
+    if (unusedCounters.length > 0) {
+      setGamePhase('counter_window_p1');
+    } else {
+      setGamePhase('exchange_p2');
+    }
+  };
+
+  const handleP1CounterPlay = (card) => {
+    setActiveCounterCard(card);
+    setP1Hand(prev => prev.filter(c => c.id !== card.id));
+    setGamePhase('counter_p1');
+  };
+
+  const handleP1CounterDone = () => {
+    setGamePhase('comeback_p2');
+  };
+
+  const handleComebackP2Done = (moveCard) => {
+    if (moveCard) setP2Hand(prev => prev.filter(c => c.id !== moveCard.id));
+    setActiveCounterCard(null);
+    setGamePhase('exchange_p2');
+  };
+
+  const handleExchangeP2Done = (action, card) => {
+    if (action === 'exchange' && card) {
+      const allIds = p2Hand.map(c => c.id);
+      const newCard = drawOneCard(history.length, allIds);
+      if (newCard) setP2Hand(prev => prev.map(c => c.id === card.id ? newCard : c));
+    } else if (action === 'burn' && card) {
+      setP2Hand(prev => prev.filter(c => c.id !== card.id));
+      setP2HasBurned(true);
+    }
+    setCurrentRound(r => r + 1);
+    // Check if P1 starts their turn with 0 cards
+    checkWinAndRoute(player1, p1Hand, 'hazard_window_for_p1');
+  };
+
+  // ── Daily flow simplified handlers ────────────────────────────────────────
+  // Daily uses old 2-phase flow: debate_p1 → debate_p2 → repeat (no hazard/counter/exchange)
+
+  const handleP1DoneDaily = (moveCard) => {
+    if (moveCard) setP1Hand(prev => prev.filter(c => c.id !== moveCard.id));
+    setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
+  };
+
+  const handleP2DoneDaily = (moveCard) => {
+    if (moveCard) setP2Hand(prev => prev.filter(c => c.id !== moveCard.id));
+    setCurrentRound(r => r + 1);
+    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
+  };
+
+  // ── Splash while loading ─────────────────────────────────────────────────
   if (!isReady) {
     return (
       <SafeAreaView style={S.safe}>
@@ -327,6 +383,7 @@ export default function App() {
     );
 
     switch (gamePhase) {
+      // ── Setup ─────────────────────────────────────────────────────────────
       case 'pick_players':
         return (
           <PlayerPickScreen
@@ -345,29 +402,34 @@ export default function App() {
             onConfirm={(card, p1, p2) => {
               setSelectedCase(card);
               setPlayer1(p1); setPlayer2(p2);
-              const all4 = dealCards(history.length, 4);
-              setP1Cards(all4.slice(0, 2));
-              setP2Cards(all4.slice(2, 4));
-              setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
+              const all6 = dealCards(history.length, 6);
+              setP1Hand(all6.slice(0, 3));
+              setP2Hand(all6.slice(3, 6));
+              setGamePhase('hazard_window_for_p1');
             }}
           />
         );
+
+      // ── P1's turn ─────────────────────────────────────────────────────────
+      case 'hazard_window_for_p1': {
+        const hazardCards = p2Hand.filter(c => c.cardType === 'hazard');
+        return (
+          <HazardWindowScreen
+            arguer={player1}
+            hazardPlayer={player2}
+            hazardCards={hazardCards}
+            onDone={handleHazardForP1}
+          />
+        );
+      }
 
       case 'corner_time_p1':
         return (
           <CornerTimeScreen
             player={player1}
-            cards={p1Cards}
+            cards={p1Hand}
+            activeHazard={activeHazard}
             onReady={() => setGamePhase('debate_p1')}
-          />
-        );
-
-      case 'corner_time_p2':
-        return (
-          <CornerTimeScreen
-            player={player2}
-            cards={p2Cards}
-            onReady={() => setGamePhase('debate_p2')}
           />
         );
 
@@ -378,24 +440,21 @@ export default function App() {
             caseCard={selectedCase}
             player={player1}
             nextPlayerName={player2?.name}
-            cards={p1Cards}
+            hand={p1Hand}
             activeHazard={activeHazard}
             debateSecs={debateSecs}
-            onDone={handleP1Done}
-            onExchange={handleP1Exchange}
+            onDone={gameMode === 'daily' ? handleP1DoneDaily : handleP1Done}
           />
         );
 
       case 'counter_window_p2': {
-        const unusedCounters = p2Cards.filter(
-          c => c.cardType === 'counter' && !p2UsedCardIds.includes(c.id)
-        );
+        const unusedCounters = p2Hand.filter(c => c.cardType === 'counter');
         return (
           <CounterWindowScreen
             player={player2}
             counterCards={unusedCounters}
             onPlay={handleP2CounterPlay}
-            onSkip={() => setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2')}
+            onSkip={() => setGamePhase('exchange_p1')}
           />
         );
       }
@@ -410,21 +469,106 @@ export default function App() {
           />
         );
 
+      case 'comeback_p1':
+        return (
+          <ComebackScreen
+            player={player1}
+            caseCard={selectedCase}
+            hand={p1Hand}
+            onDone={handleComebackP1Done}
+          />
+        );
+
+      case 'exchange_p1':
+        return (
+          <ExchangeScreen
+            player={player1}
+            hand={p1Hand}
+            hasBurned={p1HasBurned}
+            onDone={handleExchangeP1Done}
+          />
+        );
+
+      // ── P2's turn ─────────────────────────────────────────────────────────
+      case 'hazard_window_for_p2': {
+        const hazardCards = p1Hand.filter(c => c.cardType === 'hazard');
+        return (
+          <HazardWindowScreen
+            arguer={player2}
+            hazardPlayer={player1}
+            hazardCards={hazardCards}
+            onDone={handleHazardForP2}
+          />
+        );
+      }
+
+      case 'corner_time_p2':
+        return (
+          <CornerTimeScreen
+            player={player2}
+            cards={p2Hand}
+            activeHazard={activeHazard}
+            onReady={() => setGamePhase('debate_p2')}
+          />
+        );
+
       case 'debate_p2':
         return (
           <DebateScreen
             key={`p2-round${currentRound}`}
             caseCard={selectedCase}
             player={player2}
-            nextPlayerName={null}
-            cards={p2Cards}
+            nextPlayerName={player1?.name}
+            hand={p2Hand}
             activeHazard={activeHazard}
             debateSecs={debateSecs}
-            onDone={handleP2Done}
-            onExchange={handleP2Exchange}
+            onDone={gameMode === 'daily' ? handleP2DoneDaily : handleP2Done}
           />
         );
 
+      case 'counter_window_p1': {
+        const unusedCounters = p1Hand.filter(c => c.cardType === 'counter');
+        return (
+          <CounterWindowScreen
+            player={player1}
+            counterCards={unusedCounters}
+            onPlay={handleP1CounterPlay}
+            onSkip={() => setGamePhase('exchange_p2')}
+          />
+        );
+      }
+
+      case 'counter_p1':
+        return (
+          <CounterScreen
+            player={player1}
+            caseCard={selectedCase}
+            counterCard={activeCounterCard}
+            onDone={handleP1CounterDone}
+          />
+        );
+
+      case 'comeback_p2':
+        return (
+          <ComebackScreen
+            player={player2}
+            caseCard={selectedCase}
+            hand={p2Hand}
+            onDone={handleComebackP2Done}
+          />
+        );
+
+      case 'exchange_p2':
+        return (
+          <ExchangeScreen
+            player={player2}
+            hand={p2Hand}
+            hasBurned={p2HasBurned}
+            onDone={handleExchangeP2Done}
+          />
+        );
+
+      // ── Win ───────────────────────────────────────────────────────────────
       case 'player_wins':
         return (
           <PlayerWinsScreen

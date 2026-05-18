@@ -160,20 +160,19 @@ export const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt 2 cards from the deck: move cards, hazard cards, and counter cards. Beginners get BRONZE tier move cards. Use them strategically — the first to play all their cards wins.
+        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt 3 cards: move cards, hazard cards, and counter cards. Beginners get BRONZE move cards. Cards are played across three phases each turn.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Debate</Text> — each player gets a timed turn. The bar at the top
-        starts full and depletes as time runs out. Your dealt cards are shown — tap one to select it.
+        <Text style={{ color: C.gold }}>Each turn has three phases</Text> — (1) Hazard Window: your opponent plays a hazard card to restrict your argument. (2) Argument: you debate and optionally play a move card. (3) Counter Window: your opponent has 15 seconds to play a counter card and interrupt with a rebuttal — then you get a 30-second comeback. At end of turn you may exchange one card.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>4</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Win</Text> — be the first to play all your cards. Rounds continue automatically until one player has used every card in their hand. No scoring screen — just play.
+        <Text style={{ color: C.gold }}>Win</Text> — be the first to have zero cards at the start of your turn. Use every card in your hand to win. No scoring — just outwit your opponent.
       </Text>
     </View>
 
@@ -301,19 +300,19 @@ export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSe
         <View style={S.settingRow}>
           <View style={{ flex: 1 }}>
             <Text style={S.settingLabel}>DEBATE TIME</Text>
-            <Text style={S.settingSubLabel}>Minutes per player turn</Text>
+            <Text style={S.settingSubLabel}>Seconds per player turn</Text>
           </View>
           <View style={S.stepper}>
             <TouchableOpacity
               style={S.stepBtn}
-              onPress={() => onDebateSecsChange(Math.max(60, debateSecs - 60))}
+              onPress={() => onDebateSecsChange(Math.max(30, debateSecs - 30))}
             >
               <Text style={S.stepBtnTxt}>−</Text>
             </TouchableOpacity>
-            <Text style={S.stepValue}>{debateSecs / 60} min</Text>
+            <Text style={S.stepValue}>{formatTime(debateSecs)}</Text>
             <TouchableOpacity
               style={S.stepBtn}
-              onPress={() => onDebateSecsChange(Math.min(900, debateSecs + 60))}
+              onPress={() => onDebateSecsChange(Math.min(900, debateSecs + 30))}
             >
               <Text style={S.stepBtnTxt}>+</Text>
             </TouchableOpacity>
@@ -626,7 +625,7 @@ export const PassScreen = ({ name, onReady }) => (
 // Gives players a moment to read their move cards and plan their argument.
 // Auto-advances when the 60s countdown expires; player can also skip early.
 
-export const CornerTimeScreen = ({ player, cards = [], moves, onReady }) => {
+export const CornerTimeScreen = ({ player, cards = [], moves, activeHazard = null, onReady }) => {
   // `cards` is the new unified prop; `moves` kept for backward-compat (daily flow)
   const allCards = cards.length > 0 ? cards : (moves || []);
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -672,6 +671,14 @@ export const CornerTimeScreen = ({ player, cards = [], moves, onReady }) => {
           style={{ width: CARD_W * 0.44, height: CARD_W * 0.44, resizeMode: 'contain', alignSelf: 'center', marginBottom: 16 }}
         />
 
+        {activeHazard ? (
+          <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 14 }}>
+            <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
+            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
+            <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
+          </View>
+        ) : null}
+
         {allCards.length > 0 ? (
           <>
             <Text style={[S.screenLabel, { marginBottom: 12 }]}>YOUR CARDS</Text>
@@ -689,35 +696,29 @@ export const CornerTimeScreen = ({ player, cards = [], moves, onReady }) => {
   );
 };
 
-// ── Debate: depleting progress bar + dealt move card picker ───────────────
-// cards: Card[] — each player's own 2 dealt cards (move / hazard / counter mix)
-// activeHazard: Card | null — hazard played by opponent; restricts this player's turn
+// ── Debate: depleting progress bar + move card picker ─────────────────────
+// hand: Card[] — player's full hand; only move cards are shown/playable here
+// activeHazard: Card | null — hazard played by opponent before this turn
 // debateSecs: total seconds for this player's turn (configurable from Account)
-// onDone(moveCard, noteText, hazardCard, hazardFollowed) — move/hazard used + whether the active hazard restriction was met
-// onExchange(card) — player exchanges a card instead of playing one
+// onDone(moveCard, hazardFollowed) — move used + whether the active hazard was followed
 
 export const DebateScreen = ({
   caseCard, player, nextPlayerName,
-  cards = [], activeHazard = null,
+  hand = [], activeHazard = null,
   debateSecs = DEFAULT_DEBATE_SECS,
-  onDone, onExchange,
+  onDone,
 }) => {
   // Honour "30 SECONDS" hazard by capping the clock
   const effectiveSecs = activeHazard?.restrictDebateSecs
     ? Math.min(activeHazard.restrictDebateSecs, debateSecs)
     : debateSecs;
 
-  const moveCards    = cards.filter(c => c.cardType === 'move');
-  const hazardCards  = cards.filter(c => c.cardType === 'hazard');
-  // counter cards are used in the CounterWindow, not shown here
+  const moveCards = hand.filter(c => c.cardType === 'move');
 
   const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
   const [selectedMove,   setSelectedMove]   = useState(null);
-  const [selectedHazard, setSelectedHazard] = useState(null);
   const [hazardFollowed, setHazardFollowed] = useState(false);
   const [showModal,      setShowModal]      = useState(false);
-  const [showExchange,   setShowExchange]   = useState(false);
-  const [exchangeCard,   setExchangeCard]   = useState(null);
   const [noteText,  setNoteText]   = useState('');
   const [inputMode, setInputMode]  = useState('text');
   const [isRecording, setIsRecording] = useState(false);
@@ -761,8 +762,7 @@ export const DebateScreen = ({
   };
 
   const tColor = timerColor(secondsLeft);
-  const toggleMove   = c => setSelectedMove(prev   => (prev?.id === c.id ? null : c));
-  const toggleHazard = c => setSelectedHazard(prev => (prev?.id === c.id ? null : c));
+  const toggleMove = c => setSelectedMove(prev => (prev?.id === c.id ? null : c));
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -863,10 +863,10 @@ export const DebateScreen = ({
           )}
         </View>
 
-        {/* Cards in hand */}
-        {(moveCards.length > 0 || hazardCards.length > 0) ? (
+        {/* Move cards in hand */}
+        {moveCards.length > 0 ? (
           <>
-            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>REMAINING CARDS</Text>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>MOVE CARDS</Text>
             {moveCards.map(card => {
               const selected = selectedMove?.id === card.id;
               const dimmed   = selectedMove !== null && !selected;
@@ -890,36 +890,6 @@ export const DebateScreen = ({
                 </TouchableOpacity>
               );
             })}
-            {hazardCards.length > 0 ? (
-              <>
-                <Text style={{ color: C.muted, fontSize: 12, marginTop: moveCards.length > 0 ? 14 : 0, marginBottom: 10, letterSpacing: 0.3 }}>
-                  Hazard cards restrict your opponent's next turn — play one at the end of your argument.
-                </Text>
-                {hazardCards.map(card => {
-                  const selected = selectedHazard?.id === card.id;
-                  const dimmed   = selectedHazard !== null && !selected;
-                  return (
-                    <TouchableOpacity
-                      key={card.id}
-                      onPress={() => toggleHazard(card)}
-                      activeOpacity={0.88}
-                      style={[
-                        { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
-                        selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
-                        dimmed && { opacity: 0.4 },
-                      ]}
-                    >
-                      <MoveCardView card={card} />
-                      {selected ? (
-                        <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
-                          <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
-                        </View>
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
-              </>
-            ) : null}
           </>
         ) : null}
 
@@ -928,13 +898,7 @@ export const DebateScreen = ({
           onPress={() => setShowModal(true)}
           style={{ marginTop: 20 }}
         />
-
-        {/* Card exchange option */}
-        {cards.length > 0 ? (
-          <TouchableOpacity onPress={() => setShowExchange(true)} style={{ paddingVertical: 16, alignItems: 'center' }}>
-            <Text style={{ color: C.muted, fontSize: 13, letterSpacing: 0.3 }}>↺  Exchange a card instead of playing one</Text>
-          </TouchableOpacity>
-        ) : <View style={{ height: 40 }} />}
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Done confirmation modal */}
@@ -947,12 +911,6 @@ export const DebateScreen = ({
                 ? `Your argument is on record.\nPass the phone to ${nextPlayerName}.`
                 : `${player.name} has spoken.\nThe Parlour awaits your verdict.`}
             </Text>
-            {selectedHazard ? (
-              <View style={{ backgroundColor: '#2A1000', borderRadius: 10, borderWidth: 1, borderColor: selectedHazard.accent, padding: 10, marginBottom: 14 }}>
-                <Text style={{ color: selectedHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2 }}>⚡ HAZARD PLAYED</Text>
-                <Text style={{ color: '#E8DFC8', fontWeight: '700', marginTop: 2 }}>{selectedHazard.name}</Text>
-              </View>
-            ) : null}
             {activeHazard && !hazardFollowed ? (
               <View style={{ backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10, marginBottom: 14 }}>
                 <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
@@ -962,41 +920,8 @@ export const DebateScreen = ({
             ) : null}
             <Btn
               label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
-              onPress={() => onDone(selectedMove, savedNoteRef.current, selectedHazard, hazardFollowed)}
+              onPress={() => onDone(selectedMove, hazardFollowed)}
             />
-          </View>
-        </View>
-      ) : null}
-
-      {/* Exchange card modal */}
-      {showExchange ? (
-        <View style={S.modalOverlay}>
-          <View style={[S.modalBox, { maxHeight: '80%' }]}>
-            <Text style={S.modalTitle}>↺  EXCHANGE A CARD</Text>
-            <Text style={[S.modalBody, { marginBottom: 14 }]}>
-              Choose a card to discard — a new one will be drawn. Your argument turn ends.
-            </Text>
-            <ScrollView>
-              {cards.filter(c => c.cardType !== 'counter').map(c => (
-                <TouchableOpacity
-                  key={c.id}
-                  onPress={() => setExchangeCard(c)}
-                  style={[
-                    { borderRadius: 12, borderWidth: 2, borderColor: exchangeCard?.id === c.id ? c.accent : C.border, padding: 12, marginBottom: 8, backgroundColor: C.surface },
-                  ]}
-                >
-                  <Text style={{ color: exchangeCard?.id === c.id ? c.accent : '#E8DFC8', fontWeight: '800' }}>{c.icon}  {c.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <Btn
-              label="CONFIRM EXCHANGE"
-              onPress={() => { if (exchangeCard) { setShowExchange(false); onExchange(exchangeCard); } }}
-              style={{ marginTop: 12 }}
-            />
-            <TouchableOpacity onPress={() => { setShowExchange(false); setExchangeCard(null); }} style={{ paddingVertical: 12 }}>
-              <Text style={{ color: C.muted, fontSize: 14, fontWeight: '700', textAlign: 'center' }}>Cancel</Text>
-            </TouchableOpacity>
           </View>
         </View>
       ) : null}
@@ -1004,13 +929,13 @@ export const DebateScreen = ({
   );
 };
 
-// ── Counter Window: 10s interrupt after opponent finishes arguing ─────────
-// counterCards: Card[] — only the counter cards P2 hasn't used yet
-// onPlay(card)  — P2 chose to play a counter card
-// onSkip()      — P2 skipped the counter window
+// ── Counter Window: 15s interrupt after opponent finishes arguing ─────────
+// counterCards: Card[] — only the unused counter cards for this player
+// onPlay(card)  — player chose to play a counter card
+// onSkip()      — player skipped the counter window
 
 export const CounterWindowScreen = ({ player, counterCards, onPlay, onSkip }) => {
-  const [secsLeft, setSecsLeft]   = useState(10);
+  const [secsLeft, setSecsLeft]   = useState(15);
   const [selected, setSelected]   = useState(null);
   const calledRef = useRef(false);
   const intervalRef = useRef(null);
@@ -1035,12 +960,12 @@ export const CounterWindowScreen = ({ player, counterCards, onPlay, onSkip }) =>
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ height: 4, backgroundColor: C.border }}>
-        <View style={{ width: `${(secsLeft / 10) * 100}%`, height: 4, backgroundColor: '#A78BFA' }} />
+        <View style={{ width: `${(secsLeft / 15) * 100}%`, height: 4, backgroundColor: '#A78BFA' }} />
       </View>
 
       <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 48, paddingBottom: 48 }]}>
         <Text style={{ color: '#A78BFA', fontWeight: '900', fontSize: 11, letterSpacing: 2, textAlign: 'center', marginBottom: 8 }}>
-          COUNTER WINDOW  ·  {secsLeft}s
+          ⚡ COUNTER WINDOW  ·  {secsLeft}s
         </Text>
         <Text style={{ fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 36, marginBottom: 6 }}>
           Heard something{'\n'}worth countering?
@@ -1140,6 +1065,313 @@ export const CounterScreen = ({ player, caseCard, counterCard, onDone }) => {
         <Btn label="✓  COUNTER DELIVERED" onPress={finish} style={{ marginTop: 24 }} />
       </ScrollView>
     </View>
+  );
+};
+
+// ── Hazard Window: opponent picks a hazard before the arguer's turn ───────
+// arguer: the player who will argue this turn
+// hazardPlayer: the opponent who picks the hazard
+// hazardCards: hazardPlayer's remaining hazard cards
+// onDone(card | null)
+
+export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], onDone }) => {
+  const [phase, setPhase] = useState('hand_to_picker'); // 'hand_to_picker' | 'pick' | 'hand_to_arguer'
+  const [selected, setSelected] = useState(null);
+  const calledRef = useRef(false);
+
+  const confirmPick = (card) => {
+    setSelected(card || null);
+    setPhase('hand_to_arguer');
+  };
+
+  const confirmReturn = () => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    onDone(selected);
+  };
+
+  if (phase === 'hand_to_picker') {
+    return (
+      <View style={S.screen}>
+        <Text style={S.coverEyebrow}>PASS THE PHONE TO</Text>
+        <Text style={S.coverHeading}>{hazardPlayer.name}</Text>
+        <Text style={S.coverHint}>⚡ Pick a hazard for {arguer.name}'s turn</Text>
+        <TouchableOpacity style={S.coverTap} onPress={() => setPhase('pick')} activeOpacity={0.8}>
+          <Text style={S.coverTapIcon}>⚡</Text>
+          <Text style={S.coverTapLabel}>TAP WHEN READY</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (phase === 'hand_to_arguer') {
+    return (
+      <View style={S.screen}>
+        <Text style={S.coverEyebrow}>NOW PASS BACK TO</Text>
+        <Text style={S.coverHeading}>{arguer.name}</Text>
+        {selected ? (
+          <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: selected.accent, padding: 14, marginHorizontal: 32, marginBottom: 20 }}>
+            <Text style={{ color: selected.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD INCOMING</Text>
+            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 2 }}>{selected.name}</Text>
+            <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{selected.what}</Text>
+          </View>
+        ) : (
+          <Text style={S.coverHint}>No hazard — argue freely this turn</Text>
+        )}
+        <TouchableOpacity style={S.coverTap} onPress={confirmReturn} activeOpacity={0.8}>
+          <Text style={S.coverTapIcon}>⚔️</Text>
+          <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // phase === 'pick'
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 48, paddingBottom: 48 }]}>
+        <Text style={{ color: '#FB923C', fontWeight: '900', fontSize: 11, letterSpacing: 2, textAlign: 'center', marginBottom: 8 }}>
+          ⚡ HAZARD WINDOW
+        </Text>
+        <Text style={{ fontSize: 26, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 36, marginBottom: 6 }}>
+          Pick a hazard{'\n'}for {arguer.name}
+        </Text>
+        <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', marginBottom: 20 }}>
+          {hazardPlayer.name} — play one hazard card to restrict {arguer.name}'s argument, or skip.
+        </Text>
+
+        {hazardCards.length === 0 ? (
+          <Text style={[S.hint, { textAlign: 'center' }]}>No hazard cards in hand — skip to continue.</Text>
+        ) : hazardCards.map(card => (
+          <TouchableOpacity
+            key={card.id}
+            onPress={() => setSelected(s => s?.id === card.id ? null : card)}
+            activeOpacity={0.88}
+            style={[
+              { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+              selected?.id === card.id && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+            ]}
+          >
+            <MoveCardView card={card} />
+            {selected?.id === card.id ? (
+              <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+        ))}
+
+        <Btn
+          label={selected ? `⚡  PLAY ${selected.name}` : 'Skip — no hazard this turn'}
+          onPress={() => confirmPick(selected)}
+          variant={selected ? 'primary' : 'secondary'}
+          style={{ marginTop: 20 }}
+        />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Comeback: 30s window for arguer after opponent's counter ──────────────
+// player: the original arguer making the comeback
+// hand: player's current full hand (we filter move cards inside)
+// onDone(moveCard | null)
+
+export const ComebackScreen = ({ player, caseCard, hand = [], onDone }) => {
+  const moveCards = hand.filter(c => c.cardType === 'move');
+  const [phase, setPhase] = useState('cover'); // 'cover' | 'argue'
+  const [secsLeft, setSecsLeft] = useState(30);
+  const [selectedMove, setSelectedMove] = useState(null);
+  const intervalRef = useRef(null);
+  const calledRef = useRef(false);
+
+  const finish = (moveCard) => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    clearInterval(intervalRef.current);
+    onDone(moveCard || null);
+  };
+
+  useEffect(() => {
+    if (phase !== 'argue') return;
+    setSecsLeft(30);
+    calledRef.current = false;
+    intervalRef.current = setInterval(() => {
+      setSecsLeft(s => {
+        if (s <= 1) { clearInterval(intervalRef.current); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'argue' && secsLeft === 0) finish(selectedMove);
+  }, [secsLeft, phase]);
+
+  const tColor = timerColor(secsLeft);
+
+  if (phase === 'cover') {
+    return (
+      <View style={S.screen}>
+        <Text style={S.coverEyebrow}>PASS BACK TO</Text>
+        <Text style={S.coverHeading}>{player.name}</Text>
+        <Text style={S.coverHint}>30 seconds to respond</Text>
+        <TouchableOpacity style={S.coverTap} onPress={() => setPhase('argue')} activeOpacity={0.8}>
+          <Text style={S.coverTapIcon}>🗡️</Text>
+          <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ height: 5, backgroundColor: C.border }}>
+        <View style={{ width: `${(secsLeft / 30) * 100}%`, height: 5, backgroundColor: tColor }} />
+      </View>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: C.surface }}>
+        <View style={[S.playerChip, { backgroundColor: C.gold }]}>
+          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}  ·  COMEBACK  ·  {secsLeft}s</Text>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 24, paddingBottom: 48 }]}>
+        <Text style={{ fontSize: 22, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 32, marginBottom: 20 }}>
+          Your comeback.{'\n'}Make it count.
+        </Text>
+        <CaseBanner card={caseCard} />
+        {moveCards.length > 0 ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 20, marginBottom: 6 }]}>OPTIONAL MOVE CARD</Text>
+            {moveCards.map(card => {
+              const sel = selectedMove?.id === card.id;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  onPress={() => setSelectedMove(p => p?.id === card.id ? null : card)}
+                  activeOpacity={0.88}
+                  style={[
+                    { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                    sel && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+                    !sel && selectedMove && { opacity: 0.4 },
+                  ]}
+                >
+                  <MoveCardView card={card} />
+                  {sel ? (
+                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ USING</Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        ) : null}
+        <Btn label="✓  COMEBACK DELIVERED" onPress={() => finish(selectedMove)} style={{ marginTop: 24 }} />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Exchange: end-of-turn card management ─────────────────────────────────
+// player: who is exchanging
+// hand: their full current hand
+// hasBurned: whether this player has already burned a card this game
+// onDone(action: 'exchange'|'burn'|'skip', card: Card|null)
+
+export const ExchangeScreen = ({ player, hand = [], hasBurned, onDone }) => {
+  const [phase, setPhase] = useState('cover'); // 'cover' | 'pick'
+  const [action, setAction] = useState(null); // 'exchange' | 'burn' | null
+  const [selectedCard, setSelectedCard] = useState(null);
+  const exchangeableCards = hand.filter(c => c.cardType !== 'counter');
+
+  const confirm = () => {
+    if (!action) { onDone('skip', null); return; }
+    if (!selectedCard) return;
+    onDone(action, selectedCard);
+  };
+
+  if (phase === 'cover') {
+    return (
+      <View style={S.screen}>
+        <Text style={S.coverEyebrow}>PASS THE PHONE TO</Text>
+        <Text style={S.coverHeading}>{player.name}</Text>
+        <Text style={S.coverHint}>End of turn — swap or skip</Text>
+        <TouchableOpacity style={S.coverTap} onPress={() => setPhase('pick')} activeOpacity={0.8}>
+          <Text style={S.coverTapIcon}>🃏</Text>
+          <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const burnAvailable = !hasBurned;
+
+  return (
+    <ScrollView
+      contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 48 }]}
+      style={{ backgroundColor: C.bg }}
+    >
+      <Text style={[S.screenLabel, { marginBottom: 4 }]}>END OF TURN</Text>
+      <Text style={[S.screenTitle, { marginBottom: 8 }]}>EXCHANGE{'\n'}A CARD?</Text>
+      <Text style={S.hint}>
+        {player.name} — swap one card for a new one, or burn it permanently (once per game).
+      </Text>
+
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 16 }}>
+        {['exchange', ...(burnAvailable ? ['burn'] : [])].map(a => (
+          <TouchableOpacity
+            key={a}
+            onPress={() => { setAction(prev => prev === a ? null : a); setSelectedCard(null); }}
+            style={{
+              flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+              borderWidth: 2,
+              borderColor: action === a ? (a === 'burn' ? '#F87171' : C.teal) : C.border,
+              backgroundColor: action === a ? (a === 'burn' ? '#1A0000' : '#001A15') : C.surface,
+            }}
+          >
+            <Text style={{ color: action === a ? (a === 'burn' ? '#F87171' : C.teal) : C.muted, fontWeight: '900', fontSize: 12, letterSpacing: 1.5 }}>
+              {a === 'exchange' ? '↺  EXCHANGE' : '🔥  BURN'}
+            </Text>
+            {a === 'burn' ? (
+              <Text style={{ color: C.muted, fontSize: 10, marginTop: 2 }}>remove, no replacement</Text>
+            ) : null}
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {action ? (
+        <>
+          <Text style={[S.screenLabel, { marginBottom: 10 }]}>
+            {action === 'exchange' ? 'CHOOSE CARD TO SWAP' : 'CHOOSE CARD TO BURN'}
+          </Text>
+          {exchangeableCards.length === 0 ? (
+            <Text style={[S.hint, { textAlign: 'center' }]}>No cards available to {action}.</Text>
+          ) : exchangeableCards.map(c => (
+            <TouchableOpacity
+              key={c.id}
+              onPress={() => setSelectedCard(p => p?.id === c.id ? null : c)}
+              style={{
+                borderRadius: 12, borderWidth: 2, padding: 12, marginBottom: 8, backgroundColor: C.surface,
+                borderColor: selectedCard?.id === c.id ? c.accent : C.border,
+              }}
+            >
+              <Text style={{ color: selectedCard?.id === c.id ? c.accent : '#E8DFC8', fontWeight: '800' }}>{c.icon}  {c.name}</Text>
+              <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{c.cardType.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </>
+      ) : null}
+
+      <Btn
+        label={action && selectedCard
+          ? (action === 'burn' ? '🔥  CONFIRM BURN' : '↺  CONFIRM EXCHANGE')
+          : 'Skip — keep my hand'}
+        onPress={confirm}
+        disabled={action !== null && selectedCard === null}
+        style={{ marginTop: 16 }}
+      />
+    </ScrollView>
   );
 };
 

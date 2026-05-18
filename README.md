@@ -10,9 +10,9 @@ A mobile card game for sharpening debate and rhetoric skills — built for a par
 
 Two players. One case. A hand of cards.
 
-A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superheroes would make terrible teachers") to hard philosophical clashes ("A world of magic would be worse than a world of technology"). Each player is **dealt their own 2 cards** from a mixed deck: **Move Cards** (rhetorical techniques), **Hazard Cards** (restrictions you play against your opponent), and **Counter Cards** (interrupt moves after your opponent argues).
+A **Case Card** sets the debate topic — from kid-friendly warm-ups ("Superheroes would make terrible teachers") to hard philosophical clashes ("A world of magic would be worse than a world of technology"). Each player is **dealt their own 3 cards** from a mixed deck: **Move Cards** (rhetorical techniques), **Hazard Cards** (restrictions you play before your opponent argues), and **Counter Cards** (interrupt moves after your opponent argues).
 
-Each player's turn is timed by a depleting progress bar. The first player to **use all their cards wins** — no point scoring, no voting. Over time, the card pool expands from Bronze to Gold tier as players build real-world persuasion and storytelling skills.
+Each player's turn has three phases: a **Hazard Window** (opponent picks a hazard), an **Argument** (timed turn with optional move card), and a **Counter Window** (15 seconds for the opponent to interrupt, triggering a 30-second comeback). The first player to have **zero cards at the start of their turn wins** — no point scoring, no voting. Over time, the card pool expands from Bronze to Gold tier as players build real-world persuasion and storytelling skills.
 
 The app treats players as **junior debaters, not students** — members of the *Parlour of Minds*. Not here to learn. Here to practise.
 
@@ -20,7 +20,7 @@ The app treats players as **junior debaters, not students** — members of the *
 
 ## Win Condition
 
-The first player to play every card in their starting hand wins. Rounds continue automatically until that happens. If an opponent plays a **Hazard Card** against you and you can't follow its restriction, you're dealt an extra card as a penalty — making it harder to win.
+The first player to have **zero cards at the start of their own turn** wins. Rounds continue automatically until that happens. If an opponent plays a **Hazard Card** against you and you don't confirm you followed it, you're dealt a penalty card — making it harder to win.
 
 ---
 
@@ -36,12 +36,23 @@ Full custom game. Browse and pick a case + players in one screen. Each player is
 - Fewer than 10 games in history → move cards are always **BRONZE (Novice)** tier
 - 10+ games → move cards dealt from the full pool (Bronze, Silver, Gold)
 - Hazard and Counter cards are always available regardless of history
-- P1 and P2 always receive different cards
+- Each player is dealt 3 cards; P1 and P2 always receive different cards
 
 **Card types:**
 - **Move Cards** — rhetorical techniques (The Fair Play, The Honest Tale, etc.). Select one during your argument turn to use it.
-- **Hazard Cards** — play at the end of your argument to restrict your opponent's next turn (e.g. "No Numbers", "One Sentence"). If the opponent can't follow the restriction, they're dealt an extra penalty card.
-- **Counter Cards** — interrupt moves shown in a 10-second window after P1 argues; P2 can play one before their own turn begins.
+- **Hazard Cards** — played by the **opponent** at the start of your turn (Hazard Window) to restrict your argument (e.g. "No Numbers", "30 Seconds"). If you can't confirm you followed the restriction, you're dealt an extra penalty card.
+- **Counter Cards** — interrupt moves shown in a **15-second window** after the arguer finishes; the opponent may play one for a quick rebuttal. The original arguer then gets a **30-second comeback**.
+
+**Turn structure (new_case mode):**
+1. **Hazard Window** — opponent picks a hazard from their hand (or skips)
+2. **Corner Time** — 60s planning window (if enabled)
+3. **Argument** — timed debate turn; optionally play a Move Card; confirm hazard compliance
+4. **Counter Window** — opponent has 15s to play a Counter Card
+5. **Counter** — opponent delivers 30s rebuttal using counter card
+6. **Comeback** — arguer gets 30s to respond (optional move card)
+7. **Exchange** — arguer may swap one card (or burn one card, once per game)
+
+**End of turn:** Check if the next player starts with 0 cards → that player wins.
 
 ### 🦊 Solo Dojo (bottom nav)
 Solo practice mode with **Argus**, the app mascot (a fox barrister). Kids drill move cards alone through a 5-step interactive arc:
@@ -61,7 +72,7 @@ Bronze cards use this full 5-step arc. Silver and Gold cards use a shorter legac
 
 Each card has two lines: **what** (what the move is) and **hint** (a structural cue — how to actually do it). Cards also carry a `status` field: `active | draft | archived`.
 
-### Move Cards (12 included — Bronze · Silver · Gold tiers)
+### Move Cards (12 — Bronze · Silver · Gold tiers)
 
 | Card | Tier | What | Hint | Inspiration |
 |---|---|---|---|---|
@@ -78,7 +89,11 @@ Each card has two lines: **what** (what the move is) and **hint** (a structural 
 | Paint the Future | Gold · Orator | Abandon the now, paint a better world | "Imagine a world where…" | Barack Obama |
 | The Bridge Builder | Gold · Master | Find common ground, show it serves both sides | "We actually want the same thing…" | Nelson Mandela |
 
-### Case Cards (17 included — Easy · Medium · Hard)
+### Hazard Cards (20 included) · Counter Cards (10 — 5 Regular · 5 Advanced)
+
+Hazard cards restrict the opponent's argument turn. Counter cards interrupt after the opponent argues.
+
+### Case Cards (25 included — Easy · Medium · Hard)
 
 All case cards carry a `status` field: `active | draft | archived`.
 
@@ -115,23 +130,30 @@ Daily Quick Draw →
   3. [Corner Time — "Prepare your case, [Name]" shown; 60s to plan, if enabled]
   4. DEBATE — progress bar depletes; P1 debates
      - Jot notes or record voice
-     - Select a move card from "REMAINING CARDS" to use it this turn
+     - Select a move card from "MOVE CARDS" to use it this turn
      - "→ PASS TO [NAME]" button ends the turn
   5. Done modal: "Pass the phone to [P2]" — P2 receives the phone
-  6. [Counter Window — 10s for P2 to play a counter card if they have one]
-  7. [Corner Time — 60s for P2, if enabled]
-  8. P2 debates; if a hazard was active, P2 sees a confirmation toggle
-     — "TAP TO CONFIRM: I FOLLOWED THE HAZARD"
-     — if P2 skips confirmation, an extra card is dealt to P2's hand automatically
-  9. Rounds continue automatically until one player uses all their cards
-  10. Win screen — "FINISH GAME →" saves result and returns home
+  6. [Corner Time — 60s for P2, if enabled]
+  7. P2 debates; rounds alternate until game ends manually (daily has no win condition)
 
 ⚔️  New Case →
   1. Browse case cards (sorted Easy → Hard, swipe or arrow)
      — or tap 🎲 Random ("🦊 Argus chooses...")
   2. Select Player 1 and Player 2 from inline dropdowns
-  3. Tap "Choose This Case" — each player dealt 2 cards (move/hazard/counter mix)
-  4–10. Same flow as Daily Quick Draw above
+  3. Tap "Choose This Case" — each player dealt 3 cards (move/hazard/counter mix)
+  4. For each turn:
+     a. Hazard Window — pass phone to opponent; they pick a hazard card (or skip);
+        pass phone back to arguer
+     b. [Corner Time — 60s to plan, if enabled; active hazard shown]
+     c. DEBATE — arguer argues; selects optional move card;
+        confirms hazard compliance toggle (or penalty card is auto-dealt)
+     d. Done modal — "Pass to [opponent]"
+     e. Counter Window — opponent has 15s to play a counter card (or skip)
+     f. [Counter — opponent delivers 30s rebuttal]
+     g. [Comeback — pass back to arguer; 30s with optional move card]
+     h. Exchange — pass to arguer; swap one card (or burn once per game, or skip)
+  5. After exchange: if next player has 0 cards → they win
+  6. Win screen — "FINISH GAME →" saves result and returns home
 
 🦊  Solo Dojo →
   1. Pick any unlocked move card from the list
@@ -145,7 +167,7 @@ Daily Quick Draw →
 
 | Setting | Default | Description |
 |---|---|---|
-| Debate Time | 5 min | Player turn duration (1–15 min) |
+| Debate Time | 1:30 (90s) | Player argument duration; adjust in 30s increments (0:30–15:00) |
 | Corner Time | ON | 60s planning window before each debate turn |
 
 **Corner Time** shows a depleting teal bar, a big personalised heading ("Prepare your case, [Name]"), and the player's move cards — giving kids time to plan their argument before the debate clock starts. Players can tap "I'm Ready" to skip early.

@@ -12,7 +12,7 @@ export const ALL_PLAY_CARDS = [...MOVE_CARDS, ...HAZARD_CARDS, ...COUNTER_CARDS]
 const { width } = Dimensions.get('window');
 
 export const CARD_W = Math.min(width * 0.88, 360);
-export const DEFAULT_DEBATE_SECS = 5 * 60;
+export const DEFAULT_DEBATE_SECS = 90;
 
 export const formatTime = s =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;

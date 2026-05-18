@@ -31,8 +31,8 @@ describe('formatTime', () => {
   test('formats 90 seconds as 01:30', () => {
     expect(formatTime(90)).toBe('01:30');
   });
-  test('formats the full debate duration (5 min) as 05:00', () => {
-    expect(formatTime(DEFAULT_DEBATE_SECS)).toBe('05:00');
+  test('formats the default debate duration (90s) as 01:30', () => {
+    expect(formatTime(DEFAULT_DEBATE_SECS)).toBe('01:30');
   });
   test('formats 3599 seconds as 59:59', () => {
     expect(formatTime(3599)).toBe('59:59');
