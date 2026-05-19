@@ -67,9 +67,8 @@ export default function App() {
   const [p1Hand, setP1Hand] = useState([]);
   const [p2Hand, setP2Hand] = useState([]);
 
-  // Once-per-game burn tracking
-  const [p1HasBurned, setP1HasBurned] = useState(false);
-  const [p2HasBurned, setP2HasBurned] = useState(false);
+  // Tracks who currently holds the phone, to avoid redundant handoff cover screens
+  const [phoneHolder, setPhoneHolder] = useState(null); // 'p1' | 'p2' | null
 
   // Active hazard / counter for the current turn
   const [activeHazard, setActiveHazard] = useState(null);
@@ -155,7 +154,7 @@ export default function App() {
     setGameMode(mode);
     setPlayer1(null); setPlayer2(null); setSelectedCase(null);
     setP1Hand([]); setP2Hand([]);
-    setP1HasBurned(false); setP2HasBurned(false);
+    setPhoneHolder(null);
     setActiveHazard(null); setActiveCounterCard(null);
     setWinningPlayer(null);
     setCurrentRound(1);
@@ -209,6 +208,7 @@ export default function App() {
     } else {
       setActiveHazard(null);
     }
+    setPhoneHolder('p1'); // phone handed back to arguer P1
     setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
   };
 
@@ -220,6 +220,7 @@ export default function App() {
     } else {
       setActiveHazard(null);
     }
+    setPhoneHolder('p2'); // phone handed back to arguer P2
     setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
   };
 
@@ -237,6 +238,9 @@ export default function App() {
       if (penalty) newHand = [...newHand, penalty];
     }
     setP1Hand(newHand);
+
+    // Debate modal passes phone to P2 for counter window
+    setPhoneHolder('p2');
 
     // Route to counter window if P2 has unused counter cards
     const unusedCounters = p2Hand.filter(c => c.cardType === 'counter');
@@ -260,6 +264,7 @@ export default function App() {
   const handleComebackP1Done = (moveCard) => {
     if (moveCard) setP1Hand(prev => prev.filter(c => c.id !== moveCard.id));
     setActiveCounterCard(null);
+    setPhoneHolder('p1'); // P1 just made comeback, still holds phone
     setGamePhase('exchange_p1');
   };
 
@@ -268,10 +273,8 @@ export default function App() {
       const allIds = p1Hand.map(c => c.id);
       const newCard = drawOneCard(history.length, allIds);
       if (newCard) setP1Hand(prev => prev.map(c => c.id === card.id ? newCard : c));
-    } else if (action === 'burn' && card) {
-      setP1Hand(prev => prev.filter(c => c.id !== card.id));
-      setP1HasBurned(true);
     }
+    setPhoneHolder('p1'); // P1 retains phone after exchange (cover or no cover)
     // Check if P2 starts their turn with 0 cards
     checkWinAndRoute(player2, p2Hand, 'hazard_window_for_p2');
   };
@@ -289,6 +292,9 @@ export default function App() {
       if (penalty) newHand = [...newHand, penalty];
     }
     setP2Hand(newHand);
+
+    // Debate modal passes phone to P1 for counter window
+    setPhoneHolder('p1');
 
     const unusedCounters = p1Hand.filter(c => c.cardType === 'counter');
     if (unusedCounters.length > 0) {
@@ -311,6 +317,7 @@ export default function App() {
   const handleComebackP2Done = (moveCard) => {
     if (moveCard) setP2Hand(prev => prev.filter(c => c.id !== moveCard.id));
     setActiveCounterCard(null);
+    setPhoneHolder('p2'); // P2 just made comeback, still holds phone
     setGamePhase('exchange_p2');
   };
 
@@ -319,10 +326,8 @@ export default function App() {
       const allIds = p2Hand.map(c => c.id);
       const newCard = drawOneCard(history.length, allIds);
       if (newCard) setP2Hand(prev => prev.map(c => c.id === card.id ? newCard : c));
-    } else if (action === 'burn' && card) {
-      setP2Hand(prev => prev.filter(c => c.id !== card.id));
-      setP2HasBurned(true);
     }
+    setPhoneHolder('p2'); // P2 retains phone after exchange (cover or no cover)
     setCurrentRound(r => r + 1);
     // Check if P1 starts their turn with 0 cards
     checkWinAndRoute(player1, p1Hand, 'hazard_window_for_p1');
@@ -418,6 +423,7 @@ export default function App() {
             arguer={player1}
             hazardPlayer={player2}
             hazardCards={hazardCards}
+            hazardPlayerAlreadyHasPhone={phoneHolder === 'p2'}
             onDone={handleHazardForP1}
           />
         );
@@ -484,7 +490,7 @@ export default function App() {
           <ExchangeScreen
             player={player1}
             hand={p1Hand}
-            hasBurned={p1HasBurned}
+            playerAlreadyHasPhone={phoneHolder === 'p1'}
             onDone={handleExchangeP1Done}
           />
         );
@@ -497,6 +503,7 @@ export default function App() {
             arguer={player2}
             hazardPlayer={player1}
             hazardCards={hazardCards}
+            hazardPlayerAlreadyHasPhone={phoneHolder === 'p1'}
             onDone={handleHazardForP2}
           />
         );
@@ -563,7 +570,7 @@ export default function App() {
           <ExchangeScreen
             player={player2}
             hand={p2Hand}
-            hasBurned={p2HasBurned}
+            playerAlreadyHasPhone={phoneHolder === 'p2'}
             onDone={handleExchangeP2Done}
           />
         );

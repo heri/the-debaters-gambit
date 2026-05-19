@@ -1074,8 +1074,10 @@ export const CounterScreen = ({ player, caseCard, counterCard, onDone }) => {
 // hazardCards: hazardPlayer's remaining hazard cards
 // onDone(card | null)
 
-export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], onDone }) => {
-  const [phase, setPhase] = useState('hand_to_picker'); // 'hand_to_picker' | 'pick' | 'hand_to_arguer'
+// hazardPlayerAlreadyHasPhone: true when hazardPlayer already holds the phone (e.g. right after they
+// completed their own ExchangeScreen), so the initial handoff cover is skipped.
+export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], hazardPlayerAlreadyHasPhone, onDone }) => {
+  const [phase, setPhase] = useState(hazardPlayerAlreadyHasPhone ? 'pick' : 'hand_to_picker'); // 'hand_to_picker' | 'pick' | 'hand_to_arguer'
   const [selected, setSelected] = useState(null);
   const calledRef = useRef(false);
 
@@ -1279,24 +1281,19 @@ export const ComebackScreen = ({ player, caseCard, hand = [], onDone }) => {
 // hasBurned: whether this player has already burned a card this game
 // onDone(action: 'exchange'|'burn'|'skip', card: Card|null)
 
-export const ExchangeScreen = ({ player, hand = [], hasBurned, onDone }) => {
-  const [phase, setPhase] = useState('cover'); // 'cover' | 'pick'
-  const [action, setAction] = useState(null); // 'exchange' | 'burn' | null
+// playerAlreadyHasPhone: true when the arguer already holds the phone (e.g. after a comeback),
+// so the handoff cover screen is skipped.
+export const ExchangeScreen = ({ player, hand = [], playerAlreadyHasPhone, onDone }) => {
+  const [phase, setPhase] = useState(playerAlreadyHasPhone ? 'pick' : 'cover');
   const [selectedCard, setSelectedCard] = useState(null);
   const exchangeableCards = hand.filter(c => c.cardType !== 'counter');
-
-  const confirm = () => {
-    if (!action) { onDone('skip', null); return; }
-    if (!selectedCard) return;
-    onDone(action, selectedCard);
-  };
 
   if (phase === 'cover') {
     return (
       <View style={S.screen}>
         <Text style={S.coverEyebrow}>PASS THE PHONE TO</Text>
         <Text style={S.coverHeading}>{player.name}</Text>
-        <Text style={S.coverHint}>End of turn — swap or skip</Text>
+        <Text style={S.coverHint}>End of turn — swap a card or skip</Text>
         <TouchableOpacity style={S.coverTap} onPress={() => setPhase('pick')} activeOpacity={0.8}>
           <Text style={S.coverTapIcon}>🃏</Text>
           <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
@@ -1304,8 +1301,6 @@ export const ExchangeScreen = ({ player, hand = [], hasBurned, onDone }) => {
       </View>
     );
   }
-
-  const burnAvailable = !hasBurned;
 
   return (
     <ScrollView
@@ -1315,60 +1310,29 @@ export const ExchangeScreen = ({ player, hand = [], hasBurned, onDone }) => {
       <Text style={[S.screenLabel, { marginBottom: 4 }]}>END OF TURN</Text>
       <Text style={[S.screenTitle, { marginBottom: 8 }]}>EXCHANGE{'\n'}A CARD?</Text>
       <Text style={S.hint}>
-        {player.name} — swap one card for a new one, or burn it permanently (once per game).
+        {player.name} — pick a card to swap for a new one, or skip.
       </Text>
 
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, marginBottom: 16 }}>
-        {['exchange', ...(burnAvailable ? ['burn'] : [])].map(a => (
-          <TouchableOpacity
-            key={a}
-            onPress={() => { setAction(prev => prev === a ? null : a); setSelectedCard(null); }}
-            style={{
-              flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-              borderWidth: 2,
-              borderColor: action === a ? (a === 'burn' ? '#F87171' : C.teal) : C.border,
-              backgroundColor: action === a ? (a === 'burn' ? '#1A0000' : '#001A15') : C.surface,
-            }}
-          >
-            <Text style={{ color: action === a ? (a === 'burn' ? '#F87171' : C.teal) : C.muted, fontWeight: '900', fontSize: 12, letterSpacing: 1.5 }}>
-              {a === 'exchange' ? '↺  EXCHANGE' : '🔥  BURN'}
-            </Text>
-            {a === 'burn' ? (
-              <Text style={{ color: C.muted, fontSize: 10, marginTop: 2 }}>remove, no replacement</Text>
-            ) : null}
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {action ? (
-        <>
-          <Text style={[S.screenLabel, { marginBottom: 10 }]}>
-            {action === 'exchange' ? 'CHOOSE CARD TO SWAP' : 'CHOOSE CARD TO BURN'}
-          </Text>
-          {exchangeableCards.length === 0 ? (
-            <Text style={[S.hint, { textAlign: 'center' }]}>No cards available to {action}.</Text>
-          ) : exchangeableCards.map(c => (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => setSelectedCard(p => p?.id === c.id ? null : c)}
-              style={{
-                borderRadius: 12, borderWidth: 2, padding: 12, marginBottom: 8, backgroundColor: C.surface,
-                borderColor: selectedCard?.id === c.id ? c.accent : C.border,
-              }}
-            >
-              <Text style={{ color: selectedCard?.id === c.id ? c.accent : '#E8DFC8', fontWeight: '800' }}>{c.icon}  {c.name}</Text>
-              <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{c.cardType.toUpperCase()}</Text>
-            </TouchableOpacity>
-          ))}
-        </>
-      ) : null}
+      <Text style={[S.screenLabel, { marginTop: 20, marginBottom: 10 }]}>CHOOSE CARD TO SWAP</Text>
+      {exchangeableCards.length === 0 ? (
+        <Text style={[S.hint, { textAlign: 'center' }]}>No cards available to exchange.</Text>
+      ) : exchangeableCards.map(c => (
+        <TouchableOpacity
+          key={c.id}
+          onPress={() => setSelectedCard(p => p?.id === c.id ? null : c)}
+          style={{
+            borderRadius: 12, borderWidth: 2, padding: 12, marginBottom: 8, backgroundColor: C.surface,
+            borderColor: selectedCard?.id === c.id ? c.accent : C.border,
+          }}
+        >
+          <Text style={{ color: selectedCard?.id === c.id ? c.accent : '#E8DFC8', fontWeight: '800' }}>{c.icon}  {c.name}</Text>
+          <Text style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{c.cardType.toUpperCase()}</Text>
+        </TouchableOpacity>
+      ))}
 
       <Btn
-        label={action && selectedCard
-          ? (action === 'burn' ? '🔥  CONFIRM BURN' : '↺  CONFIRM EXCHANGE')
-          : 'Skip — keep my hand'}
-        onPress={confirm}
-        disabled={action !== null && selectedCard === null}
+        label={selectedCard ? '↺  CONFIRM EXCHANGE' : 'Skip — keep my hand'}
+        onPress={() => onDone(selectedCard ? 'exchange' : 'skip', selectedCard)}
         style={{ marginTop: 16 }}
       />
     </ScrollView>

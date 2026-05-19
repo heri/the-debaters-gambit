@@ -50,7 +50,7 @@ Full custom game. Browse and pick a case + players in one screen. Each player is
 4. **Counter Window** — opponent has 15s to play a Counter Card
 5. **Counter** — opponent delivers 30s rebuttal using counter card
 6. **Comeback** — arguer gets 30s to respond (optional move card)
-7. **Exchange** — arguer may swap one card (or burn one card, once per game)
+7. **Exchange** — arguer may swap one card (or skip)
 
 **End of turn:** Check if the next player starts with 0 cards → that player wins.
 
@@ -151,7 +151,7 @@ Daily Quick Draw →
      e. Counter Window — opponent has 15s to play a counter card (or skip)
      f. [Counter — opponent delivers 30s rebuttal]
      g. [Comeback — pass back to arguer; 30s with optional move card]
-     h. Exchange — pass to arguer; swap one card (or burn once per game, or skip)
+     h. Exchange — pass to arguer; swap one card (or skip)
   5. After exchange: if next player has 0 cards → they win
   6. Win screen — "FINISH GAME →" saves result and returns home
 
