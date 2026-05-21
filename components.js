@@ -223,6 +223,103 @@ export const CardBrowser = ({ cards, renderCard, onChoose, showRandom, title, su
   );
 };
 
+// ── Hand panel — persistent card hand viewer for VS mode ─────────────────
+// Shows the player's full hand at the bottom of the screen, just above the nav.
+// Cards are stacked (2 px offset per card visible behind) and cycle one by one.
+// hand: Card[] — the current player's live hand
+export const HandPanel = ({ hand }) => {
+  const [idx, setIdx] = useState(0);
+  const clampedIdx = Math.min(idx, Math.max(hand.length - 1, 0));
+
+  if (hand.length === 0) return null;
+
+  const card = hand[clampedIdx];
+  const isHazard  = card.cardType === 'hazard';
+  const isCounter = card.cardType === 'counter';
+  const badgeText = isHazard  ? 'HAZARD'
+                  : isCounter ? 'COUNTER'
+                  : `MOVE  ·  ${card.tier}`;
+
+  const prev = () => setIdx(i => Math.max(0, i - 1));
+  const next = () => setIdx(i => Math.min(hand.length - 1, i + 1));
+
+  // Stack shadow layers behind the front card
+  const stackLayers = Math.min(hand.length - 1, 2);
+
+  return (
+    <View style={{
+      borderTopWidth: 1, borderTopColor: C.border,
+      backgroundColor: C.surface,
+      paddingTop: 10, paddingBottom: 8, paddingHorizontal: 12,
+    }}>
+      {/* Header row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <Text style={{ color: C.muted, fontSize: 10, fontWeight: '700', letterSpacing: 2 }}>
+          YOUR HAND
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          {hand.map((_, i) => (
+            <View key={i} style={[
+              { width: 6, height: 6, borderRadius: 3, backgroundColor: C.border },
+              i === clampedIdx && { backgroundColor: C.gold, width: 14, borderRadius: 3 },
+            ]} />
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <TouchableOpacity
+            onPress={prev}
+            disabled={clampedIdx === 0}
+            style={{ paddingHorizontal: 8, paddingVertical: 4, opacity: clampedIdx === 0 ? 0.25 : 1 }}
+          >
+            <Text style={{ color: C.gold, fontWeight: '700', fontSize: 16 }}>‹</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={next}
+            disabled={clampedIdx === hand.length - 1}
+            style={{ paddingHorizontal: 8, paddingVertical: 4, opacity: clampedIdx === hand.length - 1 ? 0.25 : 1 }}
+          >
+            <Text style={{ color: C.gold, fontWeight: '700', fontSize: 16 }}>›</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Stacked card area */}
+      <View style={{ position: 'relative', alignSelf: 'center', width: CARD_W }}>
+        {/* Shadow layers behind */}
+        {[...Array(stackLayers)].map((_, i) => (
+          <View key={i} style={{
+            position: 'absolute',
+            top: (stackLayers - i) * 3,
+            left: (stackLayers - i) * 3,
+            right: -(stackLayers - i) * 3,
+            height: 72, borderRadius: 14,
+            backgroundColor: i === 0 ? C.bg : C.border,
+            borderWidth: 1, borderColor: C.border,
+          }} />
+        ))}
+
+        {/* Front card */}
+        <View style={{
+          backgroundColor: card.bg, borderRadius: 14,
+          borderWidth: 1.5, borderColor: card.accent,
+          padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12,
+        }}>
+          <Text style={{ fontSize: 36 }}>{card.icon}</Text>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <View style={{ borderWidth: 1, borderColor: card.accent, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ color: card.accent, fontSize: 9, fontWeight: '700', letterSpacing: 1 }}>{badgeText}</Text>
+              </View>
+            </View>
+            <Text style={{ color: '#E8DFC8', fontWeight: '900', fontSize: 15, letterSpacing: 0.5, marginBottom: 2 }}>{card.name}</Text>
+            <Text style={{ color: 'rgba(232,223,200,0.7)', fontSize: 11, lineHeight: 15 }} numberOfLines={2}>{card.what}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 // ── Bottom navigation bar ──────────────────────────────────────────────────
 
 export const BottomNav = ({ activeTab, onTabPress }) => (

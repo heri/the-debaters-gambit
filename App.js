@@ -16,8 +16,9 @@ import {
   PlayerPickScreen, CasePickScreen, CornerTimeScreen, DebateScreen,
   HazardWindowScreen, CounterWindowScreen, CounterScreen,
   ComebackScreen, ExchangeScreen, PlayerWinsScreen,
-  SoloDojoScreen,
+  SoloDojoScreen, QuickDrawScreen,
 } from './screens';
+import { HandPanel } from './components';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GAME FLOW (new_case)
@@ -158,7 +159,10 @@ export default function App() {
     setActiveHazard(null); setActiveCounterCard(null);
     setWinningPlayer(null);
     setCurrentRound(1);
-    setGamePhase(mode === 'new_case' ? 'pick_case' : 'pick_players');
+    const firstPhase = mode === 'new_case' ? 'pick_case'
+                     : mode === 'quickdraw' ? 'quickdraw'
+                     : 'pick_players';
+    setGamePhase(firstPhase);
   };
 
   const handleTabPress = tab => {
@@ -167,10 +171,8 @@ export default function App() {
   };
 
   const handlePlayDaily = () => {
-    resetGame('daily');
+    resetGame('quickdraw');
     setSelectedCase(dailyDraw.caseCard);
-    setP1Hand([dailyDraw.moveCard]);
-    setP2Hand([dailyDraw.moveCard]);
     setActiveTab('game');
   };
 
@@ -352,7 +354,7 @@ export default function App() {
     return (
       <SafeAreaView style={S.safe}>
         <ExpoStatusBar style="light" />
-        <HomeScreen dailyDraw={dailyDraw} onPlayDaily={() => {}} canPlay={false} />
+        <HomeScreen dailyDraw={dailyDraw} onPlayDaily={() => {}} />
       </SafeAreaView>
     );
   }
@@ -363,7 +365,6 @@ export default function App() {
       <HomeScreen
         dailyDraw={dailyDraw}
         onPlayDaily={handlePlayDaily}
-        canPlay={players.length >= 2}
         history={history}
         myName={players[0]?.name}
       />
@@ -388,6 +389,16 @@ export default function App() {
     );
 
     switch (gamePhase) {
+      // ── Quick Draw (solo) ─────────────────────────────────────────────────
+      case 'quickdraw':
+        return (
+          <QuickDrawScreen
+            caseCard={selectedCase}
+            cards={dailyDraw.cards}
+            onDone={() => { setActiveTab('home'); resetGame('new_case'); }}
+          />
+        );
+
       // ── Setup ─────────────────────────────────────────────────────────────
       case 'pick_players':
         return (
@@ -589,10 +600,22 @@ export default function App() {
     }
   };
 
+  // Show the HandPanel only when the current phone-holder is actively playing
+  // their VS turn (not during cover/handoff screens).
+  const handPanelHand = (() => {
+    if (activeTab !== 'game' || gameMode !== 'new_case') return null;
+    if (['corner_time_p1', 'debate_p1', 'comeback_p1'].includes(gamePhase)) return p1Hand;
+    if (['counter_window_p2'].includes(gamePhase)) return p2Hand;
+    if (['corner_time_p2', 'debate_p2', 'comeback_p2'].includes(gamePhase)) return p2Hand;
+    if (['counter_window_p1'].includes(gamePhase)) return p1Hand;
+    return null;
+  })();
+
   return (
     <SafeAreaView style={S.safe}>
       <ExpoStatusBar style="light" />
       <View style={{ flex: 1 }}>{renderContent()}</View>
+      {handPanelHand ? <HandPanel hand={handPanelHand} /> : null}
       <BottomNav activeTab={activeTab} onTabPress={handleTabPress} />
     </SafeAreaView>
   );

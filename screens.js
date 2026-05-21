@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CARD_W, DEFAULT_DEBATE_SECS, MOVE_CARDS, sortedCases, formatTime, timerColor } from './data';
 import { DRILLS, DRILLS_LEGACY } from './drills';
 import { C, S } from './styles';
-import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner } from './components';
+import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner, HandPanel } from './components';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -48,10 +48,9 @@ const HistoryEntry = ({ item, myName }) => {
 };
 
 // ── Home ───────────────────────────────────────────────────────────────────
-// dailyDraw: { caseCard, moveCard } — pre-seeded by today's date
-// canPlay: whether >= 2 players exist (disables the daily button if not)
+// dailyDraw: { caseCard, cards: Card[] } — pre-seeded by today's date
 
-export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay, history = [], myName }) => (
+export const HomeScreen = ({ dailyDraw, onPlayDaily, history = [], myName }) => (
   <ScrollView
     contentContainerStyle={[S.scrollContent, { paddingTop: 60, paddingBottom: 40 }]}
     style={{ backgroundColor: C.bg }}
@@ -61,8 +60,8 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay, history = [], myNa
 
     {/* Daily Quick Draw card */}
     <TouchableOpacity
-      style={[S.dailyCard, !canPlay && S.dailyPlayBtnDisabled]}
-      onPress={canPlay ? onPlayDaily : null}
+      style={S.dailyCard}
+      onPress={onPlayDaily}
       activeOpacity={0.85}
     >
       <Text style={S.dailyLabel}>TODAY'S QUICK DRAW</Text>
@@ -70,18 +69,30 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay, history = [], myNa
         {dailyDraw.caseCard.title}
       </Text>
       <View style={S.dailyDivider} />
-      <Text style={S.dailyMoveLabel}>MOVE OF THE DAY</Text>
-      <Text style={S.dailyMoveName}>
-        {dailyDraw.moveCard.icon}  {dailyDraw.moveCard.name}
-      </Text>
-      <View style={[S.dailyPlayBtn, !canPlay && { opacity: 0.5 }]}>
-        <Text style={S.dailyPlayBtnTxt}>
-          {canPlay ? '▶  PLAY TODAY\'S ROUND' : 'ADD 2 PLAYERS TO PLAY'}
-        </Text>
+      <Text style={S.dailyMoveLabel}>TODAY'S CARDS</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {dailyDraw.cards.map(card => (
+          <View
+            key={card.id}
+            style={{
+              borderRadius: 8, borderWidth: 1.5, borderColor: card.accent,
+              backgroundColor: card.bg, paddingHorizontal: 10, paddingVertical: 5,
+              flexDirection: 'row', alignItems: 'center', gap: 4,
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>{card.icon}</Text>
+            <Text style={{ color: card.accent, fontWeight: '800', fontSize: 11, letterSpacing: 0.5 }}>
+              {card.name}
+            </Text>
+          </View>
+        ))}
+      </View>
+      <View style={S.dailyPlayBtn}>
+        <Text style={S.dailyPlayBtnTxt}>▶  START QUICK DRAW</Text>
       </View>
     </TouchableOpacity>
 
-    <Text style={[S.hint, { marginTop: 20 }]}>Step into the Parlour — tap ⚔️ to choose your case</Text>
+    <Text style={[S.hint, { marginTop: 20 }]}>Step into the Parlour — tap ⚔️ VS to pick your case</Text>
 
     {history.length > 0 ? (
       <>
@@ -94,6 +105,106 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, canPlay, history = [], myNa
     ) : null}
   </ScrollView>
 );
+
+// ── Quick Draw — solo creative challenge ──────────────────────────────────
+// caseCard: the day's case card
+// cards: Card[] — 3 move/hazard cards dealt for this draw
+// onDone() — called when the player finishes (all cards used or exits)
+
+export const QuickDrawScreen = ({ caseCard, cards, onDone }) => {
+  const [selectedId, setSelectedId] = useState(null);
+  const [usedIds, setUsedIds]       = useState([]);
+  const allUsed = usedIds.length === cards.length;
+
+  const handleSelect = id => {
+    if (usedIds.includes(id)) return;
+    setSelectedId(prev => (prev === id ? null : id));
+  };
+
+  const handleConfirm = () => {
+    if (!selectedId) return;
+    setUsedIds(prev => [...prev, selectedId]);
+    setSelectedId(null);
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 56, paddingBottom: 60 }]}>
+        <Text style={{ color: C.teal, fontWeight: '900', fontSize: 11, letterSpacing: 2, marginBottom: 6 }}>
+          ⚡ QUICK DRAW
+        </Text>
+        <Text style={{ fontSize: 22, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 30, marginBottom: 20 }}>
+          Argue the case.{'\n'}Use your cards.
+        </Text>
+
+        {/* Case card */}
+        <View style={S.caseBanner}>
+          <Text style={S.caseBannerLabel}>THE CASE</Text>
+          <Text style={S.caseBannerTitle}>{caseCard.title}</Text>
+          <Text style={S.caseBannerDesc}>{caseCard.description}</Text>
+        </View>
+
+        <Text style={[S.screenLabel, { marginTop: 24, marginBottom: 12 }]}>
+          {usedIds.length}/{cards.length} CARDS USED
+        </Text>
+
+        {/* Cards */}
+        {cards.map(card => {
+          const used     = usedIds.includes(card.id);
+          const selected = selectedId === card.id;
+          return (
+            <TouchableOpacity
+              key={card.id}
+              onPress={() => handleSelect(card.id)}
+              activeOpacity={used ? 1 : 0.88}
+              style={[
+                { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+                used && { opacity: 0.35 },
+              ]}
+            >
+              <MoveCardView card={card} />
+              {selected ? (
+                <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                  <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ USING</Text>
+                </View>
+              ) : null}
+              {used ? (
+                <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 20 }}>
+                  <View style={{ backgroundColor: 'rgba(13,15,28,0.7)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 6 }}>
+                    <Text style={{ color: '#4ADE80', fontWeight: '900', fontSize: 12, letterSpacing: 2 }}>✓ USED</Text>
+                  </View>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Confirm / done button */}
+        {allUsed ? (
+          <>
+            <View style={{ marginTop: 24, marginBottom: 8, padding: 16, backgroundColor: '#071A07', borderRadius: 16, borderWidth: 1.5, borderColor: '#4ADE80' }}>
+              <Text style={{ color: '#4ADE80', fontWeight: '900', fontSize: 14, textAlign: 'center', letterSpacing: 1, lineHeight: 22 }}>
+                All cards played.{'\n'}The Parlour notes your argument.
+              </Text>
+            </View>
+            <Btn label="FINISH  →" onPress={onDone} style={{ marginTop: 8 }} />
+          </>
+        ) : (
+          <>
+            <Btn
+              label={selectedId ? '✓  CONFIRM — I USED THIS CARD' : 'Tap a card to use it'}
+              onPress={handleConfirm}
+              disabled={!selectedId}
+              style={{ marginTop: 24, opacity: selectedId ? 1 : 0.5 }}
+            />
+            <Btn label="Exit Draw" variant="secondary" onPress={onDone} style={{ marginTop: 4 }} />
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
+};
 
 // ── Help ───────────────────────────────────────────────────────────────────
 
@@ -222,15 +333,34 @@ export const HelpScreen = () => (
     <View style={S.helpDivider} />
     <Text style={[S.screenTitle, { marginTop: 8 }]}>QUICK DRAW</Text>
     <Text style={S.helpBody}>
-      Every day the app generates a unique pairing — one Case and one Move Card of
-      the Day — seeded from the date. Tap{' '}
-      <Text style={{ color: C.gold }}>▶ Play Today's Round</Text> on the home
-      screen to jump straight in. No browsing, no choosing — just debate.
+      Every day the home screen deals a fresh challenge — one Case Card and three
+      play cards (move or hazard), seeded from the date. Everyone gets the same
+      draw on the same day.
     </Text>
     <Text style={S.helpBody}>
-      Your streak will be tracked here in a future update. Start playing daily now
-      to build the habit before the counter arrives.
+      Tap <Text style={{ color: C.gold }}>▶ Start Quick Draw</Text> to begin.
+      No opponent, no timer — just you and your creativity. Argue the case using
+      the cards as your tools.
     </Text>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>1</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Read the case</Text> — it's your prompt. Argue for it, against it, or sideways. Creativity counts.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>2</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Tap a card to select it</Text> — it highlights to show you're using it.
+        Press <Text style={{ color: C.gold }}>Confirm</Text> to mark it as played.
+      </Text>
+    </View>
+    <View style={S.helpRule}>
+      <Text style={S.helpRuleNum}>3</Text>
+      <Text style={S.helpRuleText}>
+        <Text style={{ color: C.gold }}>Use all three cards</Text> — when the last one is confirmed, the Quick Draw is complete. You can use them one by one or all at once.
+      </Text>
+    </View>
   </ScrollView>
 );
 
@@ -718,7 +848,6 @@ export const DebateScreen = ({
   const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
   const [selectedMove,   setSelectedMove]   = useState(null);
   const [hazardFollowed, setHazardFollowed] = useState(false);
-  const [showModal,      setShowModal]      = useState(false);
   const [noteText,  setNoteText]   = useState('');
   const [inputMode, setInputMode]  = useState('text');
   const [isRecording, setIsRecording] = useState(false);
@@ -726,19 +855,26 @@ export const DebateScreen = ({
   const [recordingUri, setRecordingUri] = useState(null);
   const intervalRef  = useRef(null);
   const savedNoteRef = useRef('');
+  const calledRef    = useRef(false);
+
+  const finish = (move, followed) => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    clearInterval(intervalRef.current);
+    onDone(move, followed);
+  };
 
   useEffect(() => { savedNoteRef.current = noteText; }, [noteText]);
 
   useEffect(() => {
-    if (showModal) return;
     intervalRef.current = setInterval(() => {
       setSecondsLeft(prev => {
-        if (prev <= 1) { clearInterval(intervalRef.current); setShowModal(true); return 0; }
+        if (prev <= 1) { clearInterval(intervalRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(intervalRef.current);
-  }, [showModal]);
+  }, []);
 
   const startRecording = async () => {
     if (!Audio) return;
@@ -760,6 +896,11 @@ export const DebateScreen = ({
     setRecordingObj(null);
     setIsRecording(false);
   };
+
+  // Auto-submit when the clock hits zero
+  useEffect(() => {
+    if (secondsLeft === 0) finish(selectedMove, hazardFollowed);
+  }, [secondsLeft]);
 
   const tColor = timerColor(secondsLeft);
   const toggleMove = c => setSelectedMove(prev => (prev?.id === c.id ? null : c));
@@ -893,38 +1034,20 @@ export const DebateScreen = ({
           </>
         ) : null}
 
+        {activeHazard && !hazardFollowed ? (
+          <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
+            <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+              ⚠️ Confirm the hazard above before passing — otherwise you'll receive a penalty card.
+            </Text>
+          </View>
+        ) : null}
         <Btn
           label={nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}` : '✓  DONE'}
-          onPress={() => setShowModal(true)}
-          style={{ marginTop: 20 }}
+          onPress={() => finish(selectedMove, hazardFollowed)}
+          style={{ marginTop: 12 }}
         />
         <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* Done confirmation modal */}
-      {showModal ? (
-        <View style={S.modalOverlay}>
-          <View style={S.modalBox}>
-            <Text style={S.modalTitle}>{secondsLeft === 0 ? "⏱  TIME'S UP!" : '✓  DONE!'}</Text>
-            <Text style={S.modalBody}>
-              {nextPlayerName
-                ? `Your argument is on record.\nPass the phone to ${nextPlayerName}.`
-                : `${player.name} has spoken.\nThe Parlour awaits your verdict.`}
-            </Text>
-            {activeHazard && !hazardFollowed ? (
-              <View style={{ backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10, marginBottom: 14 }}>
-                <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
-                  ⚠️ Hazard not confirmed — one extra card will be added to your hand.
-                </Text>
-              </View>
-            ) : null}
-            <Btn
-              label={nextPlayerName ? `PASS TO ${nextPlayerName.toUpperCase()}  →` : 'CONTINUE  →'}
-              onPress={() => onDone(selectedMove, hazardFollowed)}
-            />
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 };
@@ -1082,14 +1205,9 @@ export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], haz
   const calledRef = useRef(false);
 
   const confirmPick = (card) => {
-    setSelected(card || null);
-    setPhase('hand_to_arguer');
-  };
-
-  const confirmReturn = () => {
     if (calledRef.current) return;
     calledRef.current = true;
-    onDone(selected);
+    onDone(card || null);
   };
 
   if (phase === 'hand_to_picker') {
@@ -1101,28 +1219,6 @@ export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], haz
         <TouchableOpacity style={S.coverTap} onPress={() => setPhase('pick')} activeOpacity={0.8}>
           <Text style={S.coverTapIcon}>⚡</Text>
           <Text style={S.coverTapLabel}>TAP WHEN READY</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (phase === 'hand_to_arguer') {
-    return (
-      <View style={S.screen}>
-        <Text style={S.coverEyebrow}>NOW PASS BACK TO</Text>
-        <Text style={S.coverHeading}>{arguer.name}</Text>
-        {selected ? (
-          <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: selected.accent, padding: 14, marginHorizontal: 32, marginBottom: 20 }}>
-            <Text style={{ color: selected.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD INCOMING</Text>
-            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 2 }}>{selected.name}</Text>
-            <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{selected.what}</Text>
-          </View>
-        ) : (
-          <Text style={S.coverHint}>No hazard — argue freely this turn</Text>
-        )}
-        <TouchableOpacity style={S.coverTap} onPress={confirmReturn} activeOpacity={0.8}>
-          <Text style={S.coverTapIcon}>⚔️</Text>
-          <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
         </TouchableOpacity>
       </View>
     );

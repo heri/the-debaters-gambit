@@ -23,7 +23,7 @@ export const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export const NAV_TABS = [
   { id: 'home',    icon: '🏠', label: 'Home' },
-  { id: 'game',    icon: '⚔️', label: 'New Case' },
+  { id: 'game',    icon: '⚔️', label: 'VS' },
   { id: 'dojo',    icon: '🦊', label: 'Dojo' },
   { id: 'account', icon: '👤', label: 'Account' },
   { id: 'help',    icon: '❓', label: 'Help' },
@@ -48,6 +48,8 @@ function seededRand(seed) {
   };
 }
 
+// Returns { caseCard, cards: Card[] } — 1 case + 3 move/hazard cards (no counter).
+// Seeded from today's date so everyone sees the same draw on a given day.
 export function getDailyDraw() {
   const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
   let hash = 5381;
@@ -55,10 +57,15 @@ export function getDailyDraw() {
     hash = (((hash << 5) + hash) + today.charCodeAt(i)) | 0;
   }
   const rand = seededRand(hash);
-  return {
-    caseCard: CASE_CARDS[Math.floor(rand() * CASE_CARDS.length)],
-    moveCard: MOVE_CARDS[Math.floor(rand() * MOVE_CARDS.length)],
-  };
+  const caseCard = CASE_CARDS[Math.floor(rand() * CASE_CARDS.length)];
+
+  // Pick 3 distinct move/hazard cards using the seeded RNG
+  const pool = [...MOVE_CARDS, ...HAZARD_CARDS];
+  for (let i = 0; i < 3; i++) {
+    const j = i + Math.floor(rand() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return { caseCard, cards: pool.slice(0, 3) };
 }
 
 // ── Move card dealing (Daily Quick Draw — move cards only) ────────────────

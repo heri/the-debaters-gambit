@@ -89,26 +89,36 @@ describe('uid', () => {
 // ── getDailyDraw ───────────────────────────────────────────────────────────
 
 describe('getDailyDraw', () => {
-  test('returns an object with caseCard and moveCard', () => {
+  test('returns an object with caseCard and cards array', () => {
     const draw = getDailyDraw();
     expect(draw).toHaveProperty('caseCard');
-    expect(draw).toHaveProperty('moveCard');
+    expect(draw).toHaveProperty('cards');
+    expect(Array.isArray(draw.cards)).toBe(true);
+  });
+  test('deals exactly 3 play cards', () => {
+    const { cards } = getDailyDraw();
+    expect(cards).toHaveLength(3);
   });
   test('caseCard is a member of CASE_CARDS', () => {
     const { caseCard } = getDailyDraw();
     const ids = CASE_CARDS.map(c => c.id);
     expect(ids).toContain(caseCard.id);
   });
-  test('moveCard is a member of MOVE_CARDS', () => {
-    const { moveCard } = getDailyDraw();
-    const ids = MOVE_CARDS.map(c => c.id);
-    expect(ids).toContain(moveCard.id);
+  test('all 3 cards are from MOVE_CARDS or HAZARD_CARDS (no counters)', () => {
+    const { cards } = getDailyDraw();
+    const validIds = new Set([...MOVE_CARDS, ...HAZARD_CARDS].map(c => c.id));
+    cards.forEach(c => expect(validIds.has(c.id)).toBe(true));
   });
-  test('is deterministic — repeated calls return identical cards', () => {
+  test('all 3 cards are distinct', () => {
+    const { cards } = getDailyDraw();
+    const ids = cards.map(c => c.id);
+    expect(new Set(ids).size).toBe(3);
+  });
+  test('is deterministic — repeated calls return identical draws', () => {
     const draw1 = getDailyDraw();
     const draw2 = getDailyDraw();
     expect(draw1.caseCard.id).toBe(draw2.caseCard.id);
-    expect(draw1.moveCard.id).toBe(draw2.moveCard.id);
+    draw1.cards.forEach((c, i) => expect(c.id).toBe(draw2.cards[i].id));
   });
   test('caseCard has all required fields', () => {
     const { caseCard } = getDailyDraw();
@@ -119,21 +129,20 @@ describe('getDailyDraw', () => {
     expect(caseCard).toHaveProperty('icon');
     expect(caseCard.title.length).toBeGreaterThan(0);
   });
-  test('moveCard has all required fields', () => {
-    const { moveCard } = getDailyDraw();
-    expect(moveCard).toHaveProperty('id');
-    expect(moveCard).toHaveProperty('name');
-    expect(moveCard).toHaveProperty('tier');
-    expect(moveCard).toHaveProperty('what');
-    expect(moveCard).toHaveProperty('hint');
-    expect(moveCard.name.length).toBeGreaterThan(0);
+  test('each play card has required fields', () => {
+    const { cards } = getDailyDraw();
+    cards.forEach(card => {
+      expect(card).toHaveProperty('id');
+      expect(card).toHaveProperty('name');
+      expect(card).toHaveProperty('what');
+      expect(card).toHaveProperty('cardType');
+      expect(card.name.length).toBeGreaterThan(0);
+    });
   });
-  test('neither card is undefined or null', () => {
-    const { caseCard, moveCard } = getDailyDraw();
+  test('caseCard is not null or undefined', () => {
+    const { caseCard } = getDailyDraw();
     expect(caseCard).not.toBeNull();
     expect(caseCard).not.toBeUndefined();
-    expect(moveCard).not.toBeNull();
-    expect(moveCard).not.toBeUndefined();
   });
 });
 

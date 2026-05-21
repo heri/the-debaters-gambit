@@ -27,10 +27,16 @@ The first player to have **zero cards at the start of their own turn** wins. Rou
 ## Game Modes
 
 ### Daily Quick Draw (Home screen)
-A pre-generated daily pairing — one Case Card and one Move Card of the Day — seeded from the date so it's identical for everyone. No browsing, no choosing. Tap **▶ Play Today's Round** and debate immediately. Foundation for the streak mechanic coming in V2.
+A pre-generated solo creative challenge — one Case Card and three play cards (move or hazard, no counter), seeded from the date so everyone sees the same draw. No timer, no opponent. Tap **▶ Start Quick Draw** to begin.
 
-### ⚔️ New Case (bottom nav)
-Full custom game. Browse and pick a case + players in one screen. Each player is dealt **2 cards** from the combined pool (move + hazard + counter). Game ends when one player uses all their cards.
+- Tap a card to select it (highlighted)
+- Press **Confirm** to mark it as played
+- When all three cards are used, the Quick Draw is complete
+
+### ⚔️ VS (bottom nav)
+Full two-player game. Browse and pick a case + players in one screen. Each player is dealt **3 cards** from the combined pool (move + hazard + counter). Game ends when one player uses all their cards.
+
+Each player's full hand is always visible in the **hand panel** at the bottom of the screen during their turns — cycle through cards one by one with ‹ › arrows.
 
 **Card dealing rules:**
 - Fewer than 10 games in history → move cards are always **BRONZE (Novice)** tier
@@ -43,7 +49,7 @@ Full custom game. Browse and pick a case + players in one screen. Each player is
 - **Hazard Cards** — played by the **opponent** at the start of your turn (Hazard Window) to restrict your argument (e.g. "No Numbers", "30 Seconds"). If you can't confirm you followed the restriction, you're dealt an extra penalty card.
 - **Counter Cards** — interrupt moves shown in a **15-second window** after the arguer finishes; the opponent may play one for a quick rebuttal. The original arguer then gets a **30-second comeback**.
 
-**Turn structure (new_case mode):**
+**Turn structure (VS mode):**
 1. **Hazard Window** — opponent picks a hazard from their hand (or skips)
 2. **Corner Time** — 60s planning window (if enabled)
 3. **Argument** — timed debate turn; optionally play a Move Card; confirm hazard compliance
@@ -125,18 +131,12 @@ All case cards carry a `status` field: `active | draft | archived`.
 First launch → Account tab (add 2 players) → game launches automatically
 
 Daily Quick Draw →
-  1. Tap "▶ Play Today's Round"
-  2. Choose 2 players (PlayerPickScreen)
-  3. [Corner Time — "Prepare your case, [Name]" shown; 60s to plan, if enabled]
-  4. DEBATE — progress bar depletes; P1 debates
-     - Jot notes or record voice
-     - Select a move card from "MOVE CARDS" to use it this turn
-     - "→ PASS TO [NAME]" button ends the turn
-  5. Done modal: "Pass the phone to [P2]" — P2 receives the phone
-  6. [Corner Time — 60s for P2, if enabled]
-  7. P2 debates; rounds alternate until game ends manually (daily has no win condition)
+  1. Tap "▶ Start Quick Draw" (no player selection needed)
+  2. Case card + 3 play cards shown
+  3. Tap a card to highlight it → press "Confirm" to mark as used
+  4. Repeat for remaining cards; when all 3 used → Quick Draw complete
 
-⚔️  New Case →
+⚔️  VS →
   1. Browse case cards (sorted Easy → Hard, swipe or arrow)
      — or tap 🎲 Random ("🦊 Argus chooses...")
   2. Select Player 1 and Player 2 from inline dropdowns
