@@ -13,37 +13,33 @@ import { S } from './styles';
 import { BottomNav } from './components';
 import {
   HomeScreen, HelpScreen, AccountScreen,
-  PlayerPickScreen, CasePickScreen, CornerTimeScreen, DebateScreen,
-  HazardWindowScreen, CounterWindowScreen, CounterScreen,
+  PlayerPickScreen, CasePickScreen, DebateScreen,
+  CounterWindowScreen,
   ComebackScreen, ExchangeScreen, PlayerWinsScreen,
   SoloDojoScreen, QuickDrawScreen,
 } from './screens';
 import { HandPanel } from './components';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// GAME FLOW (new_case)
+// GAME FLOW (VS mode)
 //
 //   pick_case
-//   → hazard_window_for_p1   (P2 plays hazard against P1, or skips)
-//   → [corner_time_p1]
-//   → debate_p1
+//   → debate_p1              (P1 argues; picks hazard for P2 inline)
 //   → counter_window_p2      (P2 has 15s to play counter, or skip)
 //   → [counter_p2]
 //   → [comeback_p1]          (only if counter played)
 //   → exchange_p1
 //   → [win check: if P2 has 0 cards → P2 wins]
-//   → hazard_window_for_p2   (P1 plays hazard against P2, or skips)
-//   → [corner_time_p2]
-//   → debate_p2
+//   → debate_p2              (P2 argues with P1's hazard; picks hazard for P1 inline)
 //   → counter_window_p1      (P1 has 15s, or skip)
 //   → [counter_p1]
 //   → [comeback_p2]
 //   → exchange_p2
 //   → [win check: if P1 has 0 cards → P1 wins]
-//   → hazard_window_for_p1   (repeat)
+//   → debate_p1              (repeat)
 //
-// GAME FLOW (daily) — simplified, move cards only:
-//   pick_players → [corner_time_p1] → debate_p1 → [corner_time_p2] → debate_p2 → repeat
+// GAME FLOW (Quick Draw — solo):
+//   quickdraw  (self-contained, no phases)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export default function App() {
@@ -75,11 +71,19 @@ export default function App() {
   const [activeHazard, setActiveHazard] = useState(null);
   const [activeCounterCard, setActiveCounterCard] = useState(null);
 
+  // Whether each player played a card (move or hazard) this turn — gates exchange eligibility
+  const [p1PlayedCard, setP1PlayedCard] = useState(false);
+  const [p2PlayedCard, setP2PlayedCard] = useState(false);
+
+  // Hazard queued during a counter-comeback, applied to the opponent's next debate turn
+  const [pendingHazardForP1, setPendingHazardForP1] = useState(null);
+  const [pendingHazardForP2, setPendingHazardForP2] = useState(null);
+
   // Winner
   const [winningPlayer, setWinningPlayer] = useState(null);
 
   const [debateSecs, setDebateSecs] = useState(DEFAULT_DEBATE_SECS);
-  const [cornerTimeEnabled, setCornerTimeEnabled] = useState(true);
+  const [cardsPerPlayer, setCardsPerPlayer] = useState(2);
   const [currentRound, setCurrentRound] = useState(1);
 
   const [history, setHistory] = useState([]);
@@ -105,8 +109,8 @@ export default function App() {
 
       if (settingsRaw) {
         const s = JSON.parse(settingsRaw);
-        if (s.debateSecs)                      setDebateSecs(s.debateSecs);
-        if (s.cornerTimeEnabled !== undefined) setCornerTimeEnabled(s.cornerTimeEnabled);
+        if (s.debateSecs)                    setDebateSecs(s.debateSecs);
+        if (s.cardsPerPlayer !== undefined)  setCardsPerPlayer(s.cardsPerPlayer);
       }
 
       if (completedDrillsRaw) setCompletedDrills(JSON.parse(completedDrillsRaw));
@@ -123,8 +127,8 @@ export default function App() {
 
   useEffect(() => {
     if (!isReady) return;
-    AsyncStorage.setItem('settings', JSON.stringify({ debateSecs, cornerTimeEnabled })).catch(() => {});
-  }, [debateSecs, cornerTimeEnabled, isReady]);
+    AsyncStorage.setItem('settings', JSON.stringify({ debateSecs, cardsPerPlayer })).catch(() => {});
+  }, [debateSecs, cardsPerPlayer, isReady]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -157,6 +161,8 @@ export default function App() {
     setP1Hand([]); setP2Hand([]);
     setPhoneHolder(null);
     setActiveHazard(null); setActiveCounterCard(null);
+    setP1PlayedCard(false); setP2PlayedCard(false);
+    setPendingHazardForP1(null); setPendingHazardForP2(null);
     setWinningPlayer(null);
     setCurrentRound(1);
     const firstPhase = mode === 'new_case' ? 'pick_case'
@@ -200,54 +206,47 @@ export default function App() {
     }
   };
 
-  // ── Hazard Window handlers ────────────────────────────────────────────────
-
-  // P2 played (or skipped) hazard before P1's turn
-  const handleHazardForP1 = (hazardCard) => {
-    if (hazardCard) {
-      setP2Hand(prev => prev.filter(c => c.id !== hazardCard.id));
-      setActiveHazard(hazardCard);
-    } else {
-      setActiveHazard(null);
-    }
-    setPhoneHolder('p1'); // phone handed back to arguer P1
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
-  };
-
-  // P1 played (or skipped) hazard before P2's turn
-  const handleHazardForP2 = (hazardCard) => {
-    if (hazardCard) {
-      setP1Hand(prev => prev.filter(c => c.id !== hazardCard.id));
-      setActiveHazard(hazardCard);
-    } else {
-      setActiveHazard(null);
-    }
-    setPhoneHolder('p2'); // phone handed back to arguer P2
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
-  };
-
   // ── P1 debate handlers ────────────────────────────────────────────────────
 
-  const handleP1Done = (moveCard, hazardFollowed) => {
+  // Called from counter_window skip and comeback to decide whether exchange is shown.
+  // p1PlayedCard is set synchronously before entering the counter_window phase,
+  // so it is safe to read here in subsequent callbacks.
+  const endP1Turn = () => {
+    setP1PlayedCard(false);
+    checkWinAndRoute(player2, p2Hand, 'debate_p2');
+  };
+
+  const handleP1Done = (moveCard, hazardFollowed, hazardCard, timedOut = false) => {
     const prevHazard = activeHazard;
-    setActiveHazard(null);
+    // Hazard for P2's next debate: P1's inline pick, or fallback to pending hazard from P2's comeback
+    const nextHazardForP2 = hazardCard || pendingHazardForP2 || null;
+    setActiveHazard(nextHazardForP2);
+    setPendingHazardForP2(null);
 
-    let newHand = moveCard ? p1Hand.filter(c => c.id !== moveCard.id) : p1Hand;
+    let newHand = p1Hand;
+    if (moveCard)   newHand = newHand.filter(c => c.id !== moveCard.id);
+    if (hazardCard) newHand = newHand.filter(c => c.id !== hazardCard.id);
 
-    // Penalty: if hazard was active and not followed → draw an extra card
     if (prevHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, newHand.map(c => c.id));
+      if (penalty) newHand = [...newHand, penalty];
+    }
+    if (timedOut) {
       const penalty = drawOneCard(history.length, newHand.map(c => c.id));
       if (penalty) newHand = [...newHand, penalty];
     }
     setP1Hand(newHand);
 
-    // Debate modal passes phone to P2 for counter window
+    const played = !!(moveCard || hazardCard);
+    setP1PlayedCard(played);
     setPhoneHolder('p2');
 
-    // Route to counter window if P2 has unused counter cards
-    const unusedCounters = p2Hand.filter(c => c.cardType === 'counter');
+    // P2 cannot counter if a hazard was just placed on them
+    const unusedCounters = (!nextHazardForP2) ? p2Hand.filter(c => c.cardType === 'counter') : [];
     if (unusedCounters.length > 0) {
       setGamePhase('counter_window_p2');
+    } else if (played) {
+      checkWinAndRoute(player2, p2Hand, 'debate_p2');
     } else {
       setGamePhase('exchange_p1');
     }
@@ -256,18 +255,18 @@ export default function App() {
   const handleP2CounterPlay = (card) => {
     setActiveCounterCard(card);
     setP2Hand(prev => prev.filter(c => c.id !== card.id));
-    setGamePhase('counter_p2');
+    setGamePhase('comeback_p2'); // P2 (who played the counter) delivers it
   };
 
-  const handleP2CounterDone = () => {
-    setGamePhase('comeback_p1');
-  };
-
-  const handleComebackP1Done = (moveCard) => {
-    if (moveCard) setP1Hand(prev => prev.filter(c => c.id !== moveCard.id));
+  // comeback_p1 = P1 delivered their counter against P2's argument → end P2's turn
+  const handleComebackP1Done = (hazardCard) => {
+    if (hazardCard) {
+      setP1Hand(prev => prev.filter(c => c.id !== hazardCard.id));
+      setPendingHazardForP2(hazardCard); // applied to P2's next debate via handleP1Done
+    }
     setActiveCounterCard(null);
-    setPhoneHolder('p1'); // P1 just made comeback, still holds phone
-    setGamePhase('exchange_p1');
+    setPhoneHolder('p1');
+    if (p2PlayedCard) { endP2Turn(); } else { setGamePhase('exchange_p2'); }
   };
 
   const handleExchangeP1Done = (action, card) => {
@@ -276,31 +275,50 @@ export default function App() {
       const newCard = drawOneCard(history.length, allIds);
       if (newCard) setP1Hand(prev => prev.map(c => c.id === card.id ? newCard : c));
     }
-    setPhoneHolder('p1'); // P1 retains phone after exchange (cover or no cover)
-    // Check if P2 starts their turn with 0 cards
-    checkWinAndRoute(player2, p2Hand, 'hazard_window_for_p2');
+    setPhoneHolder('p1');
+    endP1Turn();
   };
 
   // ── P2 debate handlers ────────────────────────────────────────────────────
 
-  const handleP2Done = (moveCard, hazardFollowed) => {
-    const prevHazard = activeHazard;
-    setActiveHazard(null);
+  const endP2Turn = () => {
+    setP2PlayedCard(false);
+    setCurrentRound(r => r + 1);
+    checkWinAndRoute(player1, p1Hand, 'debate_p1');
+  };
 
-    let newHand = moveCard ? p2Hand.filter(c => c.id !== moveCard.id) : p2Hand;
+  const handleP2Done = (moveCard, hazardFollowed, hazardCard, timedOut = false) => {
+    const prevHazard = activeHazard;
+    // Hazard for P1's next debate: P2's inline pick, or fallback to pending hazard from P1's comeback
+    const nextHazardForP1 = hazardCard || pendingHazardForP1 || null;
+    setActiveHazard(nextHazardForP1);
+    setPendingHazardForP1(null);
+
+    let newHand = p2Hand;
+    if (moveCard)   newHand = newHand.filter(c => c.id !== moveCard.id);
+    if (hazardCard) newHand = newHand.filter(c => c.id !== hazardCard.id);
 
     if (prevHazard && !hazardFollowed) {
       const penalty = drawOneCard(history.length, newHand.map(c => c.id));
       if (penalty) newHand = [...newHand, penalty];
     }
+    if (timedOut) {
+      const penalty = drawOneCard(history.length, newHand.map(c => c.id));
+      if (penalty) newHand = [...newHand, penalty];
+    }
     setP2Hand(newHand);
 
-    // Debate modal passes phone to P1 for counter window
+    const played = !!(moveCard || hazardCard);
+    setP2PlayedCard(played);
     setPhoneHolder('p1');
 
-    const unusedCounters = p1Hand.filter(c => c.cardType === 'counter');
+    // P1 cannot counter if a hazard was just placed on them
+    const unusedCounters = (!nextHazardForP1) ? p1Hand.filter(c => c.cardType === 'counter') : [];
     if (unusedCounters.length > 0) {
       setGamePhase('counter_window_p1');
+    } else if (played) {
+      setCurrentRound(r => r + 1);
+      checkWinAndRoute(player1, p1Hand, 'debate_p1');
     } else {
       setGamePhase('exchange_p2');
     }
@@ -309,18 +327,18 @@ export default function App() {
   const handleP1CounterPlay = (card) => {
     setActiveCounterCard(card);
     setP1Hand(prev => prev.filter(c => c.id !== card.id));
-    setGamePhase('counter_p1');
+    setGamePhase('comeback_p1'); // P1 (who played the counter) delivers it
   };
 
-  const handleP1CounterDone = () => {
-    setGamePhase('comeback_p2');
-  };
-
-  const handleComebackP2Done = (moveCard) => {
-    if (moveCard) setP2Hand(prev => prev.filter(c => c.id !== moveCard.id));
+  // comeback_p2 = P2 delivered their counter against P1's argument → end P1's turn
+  const handleComebackP2Done = (hazardCard) => {
+    if (hazardCard) {
+      setP2Hand(prev => prev.filter(c => c.id !== hazardCard.id));
+      setPendingHazardForP1(hazardCard); // applied to P1's next debate via handleP2Done
+    }
     setActiveCounterCard(null);
-    setPhoneHolder('p2'); // P2 just made comeback, still holds phone
-    setGamePhase('exchange_p2');
+    setPhoneHolder('p2');
+    if (p1PlayedCard) { endP1Turn(); } else { setGamePhase('exchange_p1'); }
   };
 
   const handleExchangeP2Done = (action, card) => {
@@ -329,10 +347,8 @@ export default function App() {
       const newCard = drawOneCard(history.length, allIds);
       if (newCard) setP2Hand(prev => prev.map(c => c.id === card.id ? newCard : c));
     }
-    setPhoneHolder('p2'); // P2 retains phone after exchange (cover or no cover)
-    setCurrentRound(r => r + 1);
-    // Check if P1 starts their turn with 0 cards
-    checkWinAndRoute(player1, p1Hand, 'hazard_window_for_p1');
+    setPhoneHolder('p2');
+    endP2Turn();
   };
 
   // ── Daily flow simplified handlers ────────────────────────────────────────
@@ -340,13 +356,13 @@ export default function App() {
 
   const handleP1DoneDaily = (moveCard) => {
     if (moveCard) setP1Hand(prev => prev.filter(c => c.id !== moveCard.id));
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p2' : 'debate_p2');
+    setGamePhase('debate_p2');
   };
 
   const handleP2DoneDaily = (moveCard) => {
     if (moveCard) setP2Hand(prev => prev.filter(c => c.id !== moveCard.id));
     setCurrentRound(r => r + 1);
-    setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
+    setGamePhase('debate_p1');
   };
 
   // ── Splash while loading ─────────────────────────────────────────────────
@@ -380,8 +396,8 @@ export default function App() {
         onRemove={handleRemovePlayer}
         debateSecs={debateSecs}
         onDebateSecsChange={setDebateSecs}
-        cornerTimeEnabled={cornerTimeEnabled}
-        onCornerTimeChange={setCornerTimeEnabled}
+        cardsPerPlayer={cardsPerPlayer}
+        onCardsPerPlayerChange={setCardsPerPlayer}
         history={history}
         isOnboarding={isOnboarding}
         myName={players[0]?.name}
@@ -406,7 +422,7 @@ export default function App() {
             players={players}
             onConfirm={(p1, p2) => {
               setPlayer1(p1); setPlayer2(p2);
-              setGamePhase(cornerTimeEnabled ? 'corner_time_p1' : 'debate_p1');
+              setGamePhase('debate_p1');
             }}
           />
         );
@@ -418,38 +434,15 @@ export default function App() {
             onConfirm={(card, p1, p2) => {
               setSelectedCase(card);
               setPlayer1(p1); setPlayer2(p2);
-              const all6 = dealCards(history.length, 6);
-              setP1Hand(all6.slice(0, 3));
-              setP2Hand(all6.slice(3, 6));
-              setGamePhase('hazard_window_for_p1');
+              const all = dealCards(history.length, cardsPerPlayer * 2);
+              setP1Hand(all.slice(0, cardsPerPlayer));
+              setP2Hand(all.slice(cardsPerPlayer, cardsPerPlayer * 2));
+              setGamePhase('debate_p1');
             }}
           />
         );
 
       // ── P1's turn ─────────────────────────────────────────────────────────
-      case 'hazard_window_for_p1': {
-        const hazardCards = p2Hand.filter(c => c.cardType === 'hazard');
-        return (
-          <HazardWindowScreen
-            arguer={player1}
-            hazardPlayer={player2}
-            hazardCards={hazardCards}
-            hazardPlayerAlreadyHasPhone={phoneHolder === 'p2'}
-            onDone={handleHazardForP1}
-          />
-        );
-      }
-
-      case 'corner_time_p1':
-        return (
-          <CornerTimeScreen
-            player={player1}
-            cards={p1Hand}
-            activeHazard={activeHazard}
-            onReady={() => setGamePhase('debate_p1')}
-          />
-        );
-
       case 'debate_p1':
         return (
           <DebateScreen
@@ -471,27 +464,18 @@ export default function App() {
             player={player2}
             counterCards={unusedCounters}
             onPlay={handleP2CounterPlay}
-            onSkip={() => setGamePhase('exchange_p1')}
+            onSkip={() => p1PlayedCard ? endP1Turn() : setGamePhase('exchange_p1')}
           />
         );
       }
-
-      case 'counter_p2':
-        return (
-          <CounterScreen
-            player={player2}
-            caseCard={selectedCase}
-            counterCard={activeCounterCard}
-            onDone={handleP2CounterDone}
-          />
-        );
 
       case 'comeback_p1':
         return (
           <ComebackScreen
             player={player1}
-            caseCard={selectedCase}
+            counterCard={activeCounterCard}
             hand={p1Hand}
+            nextPlayerName={player2?.name}
             onDone={handleComebackP1Done}
           />
         );
@@ -501,35 +485,11 @@ export default function App() {
           <ExchangeScreen
             player={player1}
             hand={p1Hand}
-            playerAlreadyHasPhone={phoneHolder === 'p1'}
             onDone={handleExchangeP1Done}
           />
         );
 
       // ── P2's turn ─────────────────────────────────────────────────────────
-      case 'hazard_window_for_p2': {
-        const hazardCards = p1Hand.filter(c => c.cardType === 'hazard');
-        return (
-          <HazardWindowScreen
-            arguer={player2}
-            hazardPlayer={player1}
-            hazardCards={hazardCards}
-            hazardPlayerAlreadyHasPhone={phoneHolder === 'p1'}
-            onDone={handleHazardForP2}
-          />
-        );
-      }
-
-      case 'corner_time_p2':
-        return (
-          <CornerTimeScreen
-            player={player2}
-            cards={p2Hand}
-            activeHazard={activeHazard}
-            onReady={() => setGamePhase('debate_p2')}
-          />
-        );
-
       case 'debate_p2':
         return (
           <DebateScreen
@@ -551,27 +511,18 @@ export default function App() {
             player={player1}
             counterCards={unusedCounters}
             onPlay={handleP1CounterPlay}
-            onSkip={() => setGamePhase('exchange_p2')}
+            onSkip={() => p2PlayedCard ? endP2Turn() : setGamePhase('exchange_p2')}
           />
         );
       }
-
-      case 'counter_p1':
-        return (
-          <CounterScreen
-            player={player1}
-            caseCard={selectedCase}
-            counterCard={activeCounterCard}
-            onDone={handleP1CounterDone}
-          />
-        );
 
       case 'comeback_p2':
         return (
           <ComebackScreen
             player={player2}
-            caseCard={selectedCase}
+            counterCard={activeCounterCard}
             hand={p2Hand}
+            nextPlayerName={player1?.name}
             onDone={handleComebackP2Done}
           />
         );
@@ -581,7 +532,6 @@ export default function App() {
           <ExchangeScreen
             player={player2}
             hand={p2Hand}
-            playerAlreadyHasPhone={phoneHolder === 'p2'}
             onDone={handleExchangeP2Done}
           />
         );
@@ -604,9 +554,9 @@ export default function App() {
   // their VS turn (not during cover/handoff screens).
   const handPanelHand = (() => {
     if (activeTab !== 'game' || gameMode !== 'new_case') return null;
-    if (['corner_time_p1', 'debate_p1', 'comeback_p1'].includes(gamePhase)) return p1Hand;
+    if (['debate_p1', 'comeback_p1'].includes(gamePhase)) return p1Hand;
     if (['counter_window_p2'].includes(gamePhase)) return p2Hand;
-    if (['corner_time_p2', 'debate_p2', 'comeback_p2'].includes(gamePhase)) return p2Hand;
+    if (['debate_p2', 'comeback_p2'].includes(gamePhase)) return p2Hand;
     if (['counter_window_p1'].includes(gamePhase)) return p1Hand;
     return null;
   })();

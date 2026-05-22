@@ -12,8 +12,6 @@ import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner, HandPanel } fro
 const { width: SCREEN_W } = Dimensions.get('window');
 
 // Graceful degradation: expo-av enables voice recording; falls back to install prompt if absent
-let Audio = null;
-try { Audio = require('expo-av').Audio; } catch (_) {}
 
 // ── History helpers ────────────────────────────────────────────────────────
 // Determine the current player's result for a saved game entry.
@@ -366,7 +364,7 @@ export const HelpScreen = () => (
 
 // ── Account ────────────────────────────────────────────────────────────────
 
-export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSecsChange, cornerTimeEnabled, onCornerTimeChange, history, isOnboarding, myName }) => {
+export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSecsChange, cardsPerPlayer, onCardsPerPlayerChange, history, isOnboarding, myName }) => {
   const [name, setName] = useState('');
 
   const submit = () => {
@@ -451,25 +449,24 @@ export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSe
 
         <View style={S.settingRow}>
           <View style={{ flex: 1 }}>
-            <Text style={S.settingLabel}>CORNER TIME</Text>
-            <Text style={S.settingSubLabel}>60s to plan before each turn</Text>
+            <Text style={S.settingLabel}>CARDS PER PLAYER</Text>
+            <Text style={S.settingSubLabel}>Cards dealt to each player in VS mode</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => onCornerTimeChange(!cornerTimeEnabled)}
-            style={{
-              paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-              backgroundColor: cornerTimeEnabled ? C.teal : C.border,
-              borderWidth: 1.5,
-              borderColor: cornerTimeEnabled ? C.teal : C.muted,
-            }}
-          >
-            <Text style={{
-              fontSize: 11, fontWeight: '900', letterSpacing: 1.5,
-              color: cornerTimeEnabled ? '#0D0F1C' : C.muted,
-            }}>
-              {cornerTimeEnabled ? 'ON' : 'OFF'}
-            </Text>
-          </TouchableOpacity>
+          <View style={S.stepper}>
+            <TouchableOpacity
+              style={S.stepBtn}
+              onPress={() => onCardsPerPlayerChange(Math.max(1, cardsPerPlayer - 1))}
+            >
+              <Text style={S.stepBtnTxt}>−</Text>
+            </TouchableOpacity>
+            <Text style={S.stepValue}>{cardsPerPlayer}</Text>
+            <TouchableOpacity
+              style={S.stepBtn}
+              onPress={() => onCardsPerPlayerChange(Math.min(5, cardsPerPlayer + 1))}
+            >
+              <Text style={S.stepBtnTxt}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {history.length > 0 ? (
@@ -843,28 +840,22 @@ export const DebateScreen = ({
     ? Math.min(activeHazard.restrictDebateSecs, debateSecs)
     : debateSecs;
 
-  const moveCards = hand.filter(c => c.cardType === 'move');
+  const moveCards   = hand.filter(c => c.cardType === 'move');
+  const hazardCards = hand.filter(c => c.cardType === 'hazard');
 
   const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
   const [selectedMove,   setSelectedMove]   = useState(null);
+  const [selectedHazard, setSelectedHazard] = useState(null);
   const [hazardFollowed, setHazardFollowed] = useState(false);
-  const [noteText,  setNoteText]   = useState('');
-  const [inputMode, setInputMode]  = useState('text');
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingObj, setRecordingObj] = useState(null);
-  const [recordingUri, setRecordingUri] = useState(null);
-  const intervalRef  = useRef(null);
-  const savedNoteRef = useRef('');
-  const calledRef    = useRef(false);
+  const intervalRef = useRef(null);
+  const calledRef   = useRef(false);
 
-  const finish = (move, followed) => {
+  const finish = (move, followed, timedOut = false) => {
     if (calledRef.current) return;
     calledRef.current = true;
     clearInterval(intervalRef.current);
-    onDone(move, followed);
+    onDone(move, followed, selectedHazard, timedOut);
   };
-
-  useEffect(() => { savedNoteRef.current = noteText; }, [noteText]);
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
@@ -876,30 +867,9 @@ export const DebateScreen = ({
     return () => clearInterval(intervalRef.current);
   }, []);
 
-  const startRecording = async () => {
-    if (!Audio) return;
-    try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecordingObj(recording);
-      setIsRecording(true);
-    } catch (_) {}
-  };
-
-  const stopRecording = async () => {
-    if (!recordingObj) return;
-    try {
-      await recordingObj.stopAndUnloadAsync();
-      setRecordingUri(recordingObj.getURI());
-    } catch (_) {}
-    setRecordingObj(null);
-    setIsRecording(false);
-  };
-
-  // Auto-submit when the clock hits zero
+  // Auto-submit when the clock hits zero; timedOut=true triggers a penalty card in App.js
   useEffect(() => {
-    if (secondsLeft === 0) finish(selectedMove, hazardFollowed);
+    if (secondsLeft === 0) finish(selectedMove, hazardFollowed, true);
   }, [secondsLeft]);
 
   const tColor = timerColor(secondsLeft);
@@ -950,60 +920,6 @@ export const DebateScreen = ({
 
         <CaseBanner card={caseCard} />
 
-        {/* Notes / voice */}
-        <View style={{ marginTop: 20 }}>
-          <View style={{ flexDirection: 'row', marginBottom: 10 }}>
-            {['text', 'voice'].map(mode => (
-              <TouchableOpacity
-                key={mode}
-                onPress={() => setInputMode(mode)}
-                style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: inputMode === mode ? C.teal : C.border }}
-              >
-                <Text style={{ color: inputMode === mode ? C.teal : C.muted, fontWeight: '700', fontSize: 12, letterSpacing: 1 }}>
-                  {mode === 'text' ? '✏️  NOTES' : '🎙  VOICE'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {inputMode === 'text' ? (
-            <TextInput
-              style={{ backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, color: '#E8E0D0', fontSize: 15, lineHeight: 22, padding: 14, minHeight: 100, textAlignVertical: 'top' }}
-              placeholder="Jot down your argument…"
-              placeholderTextColor={C.muted}
-              multiline
-              value={noteText}
-              onChangeText={setNoteText}
-            />
-          ) : Audio ? (
-            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
-              {isRecording ? (
-                <>
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FC8181', marginBottom: 10 }} />
-                  <Text style={{ color: '#FC8181', fontWeight: '700', fontSize: 12, letterSpacing: 1, marginBottom: 16 }}>RECORDING…</Text>
-                  <TouchableOpacity onPress={stopRecording} style={{ backgroundColor: '#FC8181', borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}>
-                    <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>⏹  STOP</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  {recordingUri ? <Text style={{ color: C.teal, fontSize: 12, marginBottom: 12 }}>Recording saved ✓</Text> : null}
-                  <TouchableOpacity onPress={startRecording} style={{ backgroundColor: C.teal, borderRadius: 40, paddingHorizontal: 28, paddingVertical: 14 }}>
-                    <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 13, letterSpacing: 1 }}>🎙  START RECORDING</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          ) : (
-            <View style={{ backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 16, alignItems: 'center' }}>
-              <Text style={{ color: C.muted, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-                Voice recording requires{' '}<Text style={{ color: C.gold, fontWeight: '700' }}>expo-av</Text>
-                {'\n\n'}Run: <Text style={{ color: C.teal, fontWeight: '700' }}>npx expo install expo-av</Text>
-              </Text>
-            </View>
-          )}
-        </View>
-
         {/* Move cards in hand */}
         {moveCards.length > 0 ? (
           <>
@@ -1026,6 +942,35 @@ export const DebateScreen = ({
                   {selected ? (
                     <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
                       <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ USING</Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        ) : null}
+
+        {/* Hazard picker for the next player */}
+        {hazardCards.length > 0 && nextPlayerName ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 4 }]}>⚡ HAZARD FOR {nextPlayerName.toUpperCase()}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to restrict {nextPlayerName}'s argument — or skip.</Text>
+            {hazardCards.map(card => {
+              const sel = selectedHazard?.id === card.id;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  onPress={() => setSelectedHazard(prev => (prev?.id === card.id ? null : card))}
+                  activeOpacity={0.88}
+                  style={[
+                    { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                    sel && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+                  ]}
+                >
+                  <MoveCardView card={card} />
+                  {sel ? (
+                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -1270,58 +1215,42 @@ export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], haz
   );
 };
 
-// ── Comeback: 30s window for arguer after opponent's counter ──────────────
-// player: the original arguer making the comeback
-// hand: player's current full hand (we filter move cards inside)
-// onDone(moveCard | null)
+// ── Comeback: the player who played the counter delivers their counter-argument ─────
+// player: the counter player (who played the counter card)
+// counterCard: the counter card they played
+// hand: counter player's current hand (we offer hazard picker from it)
+// nextPlayerName: name of the player they're countering (for hazard label)
+// onDone(hazardCard | null)
 
-export const ComebackScreen = ({ player, caseCard, hand = [], onDone }) => {
-  const moveCards = hand.filter(c => c.cardType === 'move');
-  const [phase, setPhase] = useState('cover'); // 'cover' | 'argue'
+export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName, onDone }) => {
+  const hazardCards = hand.filter(c => c.cardType === 'hazard');
   const [secsLeft, setSecsLeft] = useState(30);
-  const [selectedMove, setSelectedMove] = useState(null);
+  const [selectedHazard, setSelectedHazard] = useState(null);
   const intervalRef = useRef(null);
   const calledRef = useRef(false);
 
-  const finish = (moveCard) => {
+  const finish = () => {
     if (calledRef.current) return;
     calledRef.current = true;
     clearInterval(intervalRef.current);
-    onDone(moveCard || null);
+    onDone(selectedHazard);
   };
 
   useEffect(() => {
-    if (phase !== 'argue') return;
-    setSecsLeft(30);
-    calledRef.current = false;
     intervalRef.current = setInterval(() => {
-      setSecsLeft(s => {
-        if (s <= 1) { clearInterval(intervalRef.current); return 0; }
-        return s - 1;
+      setSecsLeft(prev => {
+        if (prev <= 1) { clearInterval(intervalRef.current); return 0; }
+        return prev - 1;
       });
     }, 1000);
     return () => clearInterval(intervalRef.current);
-  }, [phase]);
+  }, []);
 
   useEffect(() => {
-    if (phase === 'argue' && secsLeft === 0) finish(selectedMove);
-  }, [secsLeft, phase]);
+    if (secsLeft === 0) finish();
+  }, [secsLeft]);
 
   const tColor = timerColor(secsLeft);
-
-  if (phase === 'cover') {
-    return (
-      <View style={S.screen}>
-        <Text style={S.coverEyebrow}>PASS BACK TO</Text>
-        <Text style={S.coverHeading}>{player.name}</Text>
-        <Text style={S.coverHint}>30 seconds to respond</Text>
-        <TouchableOpacity style={S.coverTap} onPress={() => setPhase('argue')} activeOpacity={0.8}>
-          <Text style={S.coverTapIcon}>🗡️</Text>
-          <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -1329,35 +1258,42 @@ export const ComebackScreen = ({ player, caseCard, hand = [], onDone }) => {
         <View style={{ width: `${(secsLeft / 30) * 100}%`, height: 5, backgroundColor: tColor }} />
       </View>
       <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: C.surface }}>
-        <View style={[S.playerChip, { backgroundColor: C.gold }]}>
-          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}  ·  COMEBACK  ·  {secsLeft}s</Text>
+        <View style={[S.playerChip, { backgroundColor: '#A78BFA' }]}>
+          <Text style={[S.playerChipTxt, { color: '#0D0F1C' }]}>{player.name.toUpperCase()}  ·  COUNTER  ·  {secsLeft}s</Text>
         </View>
       </View>
-      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 24, paddingBottom: 48 }]}>
-        <Text style={{ fontSize: 22, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 32, marginBottom: 20 }}>
-          Your comeback.{'\n'}Make it count.
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 16, paddingBottom: 48 }]}>
+        <Text style={{ fontSize: 24, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 34, marginBottom: 16 }}>
+          Deliver your counter,{'\n'}{player.name}
         </Text>
-        <CaseBanner card={caseCard} />
-        {moveCards.length > 0 ? (
+
+        {counterCard ? (
+          <View style={{ backgroundColor: '#0D0029', borderRadius: 14, borderWidth: 1.5, borderColor: counterCard.accent, padding: 16, marginBottom: 16 }}>
+            <Text style={{ color: counterCard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>🗡 {counterCard.name}</Text>
+            <Text style={{ color: '#E8DFC8', fontSize: 14, fontWeight: '600', lineHeight: 22 }}>{counterCard.hint}</Text>
+          </View>
+        ) : null}
+
+        {hazardCards.length > 0 && nextPlayerName ? (
           <>
-            <Text style={[S.screenLabel, { marginTop: 20, marginBottom: 6 }]}>OPTIONAL MOVE CARD</Text>
-            {moveCards.map(card => {
-              const sel = selectedMove?.id === card.id;
+            <Text style={[S.screenLabel, { marginTop: 8, marginBottom: 4 }]}>⚡ HAZARD FOR {nextPlayerName.toUpperCase()}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to restrict {nextPlayerName}'s next argument — or skip.</Text>
+            {hazardCards.map(card => {
+              const sel = selectedHazard?.id === card.id;
               return (
                 <TouchableOpacity
                   key={card.id}
-                  onPress={() => setSelectedMove(p => p?.id === card.id ? null : card)}
+                  onPress={() => setSelectedHazard(prev => (prev?.id === card.id ? null : card))}
                   activeOpacity={0.88}
                   style={[
                     { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
                     sel && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
-                    !sel && selectedMove && { opacity: 0.4 },
                   ]}
                 >
                   <MoveCardView card={card} />
                   {sel ? (
                     <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
-                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ USING</Text>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⚡ PLAYING</Text>
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -1365,7 +1301,9 @@ export const ComebackScreen = ({ player, caseCard, hand = [], onDone }) => {
             })}
           </>
         ) : null}
-        <Btn label="✓  COMEBACK DELIVERED" onPress={() => finish(selectedMove)} style={{ marginTop: 24 }} />
+
+        <Btn label="✓  COUNTER DELIVERED" onPress={finish} style={{ marginTop: 16 }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -1379,24 +1317,9 @@ export const ComebackScreen = ({ player, caseCard, hand = [], onDone }) => {
 
 // playerAlreadyHasPhone: true when the arguer already holds the phone (e.g. after a comeback),
 // so the handoff cover screen is skipped.
-export const ExchangeScreen = ({ player, hand = [], playerAlreadyHasPhone, onDone }) => {
-  const [phase, setPhase] = useState(playerAlreadyHasPhone ? 'pick' : 'cover');
+export const ExchangeScreen = ({ player, hand = [], onDone }) => {
   const [selectedCard, setSelectedCard] = useState(null);
   const exchangeableCards = hand.filter(c => c.cardType !== 'counter');
-
-  if (phase === 'cover') {
-    return (
-      <View style={S.screen}>
-        <Text style={S.coverEyebrow}>PASS THE PHONE TO</Text>
-        <Text style={S.coverHeading}>{player.name}</Text>
-        <Text style={S.coverHint}>End of turn — swap a card or skip</Text>
-        <TouchableOpacity style={S.coverTap} onPress={() => setPhase('pick')} activeOpacity={0.8}>
-          <Text style={S.coverTapIcon}>🃏</Text>
-          <Text style={S.coverTapLabel}>I HAVE THE PHONE</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <ScrollView
