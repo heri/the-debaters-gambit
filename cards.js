@@ -159,7 +159,9 @@ export const HAZARD_CARDS = [
     hint: 'One sentence — no more.',
     status: 'active',
   },
+
   {
+  
     id: 'h3', name: 'MUST USE NUMBERS', icon: '🔢⚡',
     cardType: 'hazard',
     bg: '#001A10', accent: '#4ADE80',
@@ -304,6 +306,167 @@ export const HAZARD_CARDS = [
     hint: 'The forbidden word must be declared out loud before the argument begins.',
     status: 'active',
   },
+  // ── New hazards ───────────────────────────────────────────────────────────
+  {
+    id: 'h21', name: 'QUESTION ENDER', icon: '❓🔚',
+    cardType: 'hazard',
+    bg: '#1A0800', accent: '#FB923C',
+    what: "The argument must end with a question — the final word out of your mouth must be a question mark.",
+    hint: 'Plan your closing line first — it must be a question, no exceptions.',
+    status: 'active',
+  },
+  {
+    id: 'h22', name: 'NO I OR ME', icon: '🚫🙋',
+    cardType: 'hazard',
+    bg: '#0F001A', accent: '#C084FC',
+    what: "The words 'I' and 'me' are banned for the entire argument.",
+    hint: "Replace every 'I' with 'one', 'we', or restructure the sentence entirely.",
+    status: 'active',
+  },
+  {
+    id: 'h23', name: 'TALK LIKE A FRENCHMAN', icon: '🇫🇷🥖',
+    cardType: 'hazard',
+    bg: '#00101A', accent: '#93C5FD',
+    what: 'Argue with the passion, flair, and casual confidence of a Frenchman who cannot believe this is even a debate.',
+    hint: "Shrug often. Speak slowly. Throw in 'zut alors' or 'c'est évident' once or twice.",
+    status: 'active',
+  },
+  {
+    id: 'h24', name: 'TALK LIKE AN ITALIAN', icon: '🇮🇹🤌',
+    cardType: 'hazard',
+    bg: '#1A0500', accent: '#FCA5A5',
+    what: 'Argue with full Italian dramatic energy — hands moving, voice rising, every sentence an opera.',
+    hint: 'Use your hands. Express everything twice as loudly as needed. Treat the debate like a family dinner.',
+    status: 'active',
+  },
+  {
+    id: 'h25', name: 'TALK LIKE A NEW YORKER', icon: '🗽🚕',
+    cardType: 'hazard',
+    bg: '#1A1200', accent: '#FCD34D',
+    what: "Argue fast, loud, and direct — a New Yorker has no time for your nonsense and neither do you.",
+    hint: "Speak quickly. Get to the point. 'I'm walkin' here' energy throughout.",
+    status: 'active',
+  },
+  {
+    id: 'h26', name: 'TALK LIKE AN AUSTRALIAN', icon: '🦘🌏',
+    cardType: 'hazard',
+    bg: '#001505', accent: '#4ADE80',
+    what: "Argue with cheerful, no-worries Australian confidence — laid-back tone, casual language, total certainty.",
+    hint: "'No worries, mate' — keep the energy sunny even when the argument gets fierce.",
+    status: 'active',
+  },
+  {
+    id: 'h27', name: 'TALK LIKE A PASTOR', icon: '⛪🕊️',
+    cardType: 'hazard',
+    bg: '#1A1200', accent: '#FDE68A',
+    what: 'Deliver the argument like a Sunday sermon — solemn, rhythmic, with moments of quiet and moments of thunder.',
+    hint: 'Pause for effect. Build to your point like the congregation needs saving.',
+    status: 'active',
+  },
+  {
+    id: 'h28', name: 'TALK LIKE A GENERAL', icon: '🎖️⚔️',
+    cardType: 'hazard',
+    bg: '#0A0A12', accent: '#94A3B8',
+    what: 'Argue with military precision — short commands, no wasted words, total authority.',
+    hint: 'Every sentence is an order. State your position like a battlefield briefing.',
+    status: 'active',
+  },
+  {
+    id: 'h29', name: 'TALK LIKE MARIO', icon: '🍄⭐',
+    cardType: 'hazard',
+    bg: '#1A0000', accent: '#EF4444',
+    what: "Argue in the cheerful, enthusiastic spirit of everyone's favourite plumber.",
+    hint: "'Mama mia!' — keep the energy high, the joy genuine, and the accent thick.",
+    status: 'active',
+  },
+  {
+    id: 'h30', name: 'TALK LIKE GANDALF', icon: '🧙‍♂️🔥',
+    cardType: 'hazard',
+    bg: '#0A0A0A', accent: '#E2E8F0',
+    what: 'Argue with ancient wisdom and absolute gravity — every sentence sounds like it was foretold.',
+    hint: "Speak slowly and with weight. Reference 'the long road', 'what must be done', or 'you shall not...'",
+    status: 'active',
+  },
+  {
+    id: 'h31', name: 'GET THE HUG', icon: '🤗💛',
+    cardType: 'hazard',
+    bg: '#1A0A12', accent: '#F472B6',
+    what: 'While arguing, make the other person so moved or charmed that they voluntarily hug you.',
+    hint: 'Warmth, humour, and genuine connection — you cannot ask for the hug directly.',
+    status: 'active',
+  },
+  {
+    id: 'h32', name: 'MAKE THEM SMILE', icon: '😊✨',
+    cardType: 'hazard',
+    bg: '#1A1200', accent: '#FCD34D',
+    what: 'Get the other person to smile at least once during your argument — genuinely, not politely.',
+    hint: 'A well-timed joke, an absurd image, or unexpected warmth. No tickling.',
+    status: 'active',
+  },
+  {
+    id: 'h33', name: 'MAKE THEM LAUGH', icon: '😂🎭',
+    cardType: 'hazard',
+    bg: '#1A0800', accent: '#FB923C',
+    what: 'Get the other person to laugh out loud during your argument.',
+    hint: 'Wit, absurdity, or a perfectly placed pause. Make it unavoidable.',
+    status: 'active',
+  },
+  {
+    id: 'h34', name: 'MAKE THEM SAD', icon: '😢💧',
+    cardType: 'hazard',
+    bg: '#00101A', accent: '#7DD3FC',
+    what: 'Deliver your argument with such poignant emotion that the other person visibly saddens.',
+    hint: 'Find the emotional heart of the topic. Make it feel real and slightly devastating.',
+    status: 'active',
+  },
+  {
+    id: 'h35', name: 'MAKE THEM ANGRY', icon: '😤🔥',
+    cardType: 'hazard',
+    bg: '#1A0000', accent: '#EF4444',
+    what: 'Argue so provocatively that the other person cannot hide their frustration.',
+    hint: 'Challenge something they care about. Contradict their deepest assumption.',
+    status: 'active',
+  },
+  {
+    id: 'h36', name: 'SIT/STAND SWAP', icon: '🪑⬆️',
+    cardType: 'hazard',
+    bg: '#0A001A', accent: '#A78BFA',
+    what: 'During your argument, get the other person to change posture — seated → standing, or standing → seated.',
+    hint: 'Invite them in, surprise them, or make the moment so dramatic they naturally move.',
+    status: 'active',
+  },
+  {
+    id: 'h37', name: 'TEST THEIR PATIENCE', icon: '😤⏳',
+    cardType: 'hazard',
+    bg: '#1A0D00', accent: '#FBBF24',
+    what: "Argue in a way that visibly tests the other person's patience — they must show obvious frustration or impatience.",
+    hint: 'Repeat yourself. Take long pauses. Meander beautifully.',
+    status: 'active',
+  },
+  {
+    id: 'h38', name: 'THE CLOCK CHECK', icon: '⌚👀',
+    cardType: 'hazard',
+    bg: '#001A1A', accent: '#2DD4BF',
+    what: 'Make the other person look at a clock, phone, or ask what time it is during your argument.',
+    hint: "Reference urgency, deadlines, or 'how long this will take' until they check.",
+    status: 'active',
+  },
+  {
+    id: 'h39', name: 'MAKE THEM SAY YES', icon: '✅🎯',
+    cardType: 'hazard',
+    bg: '#001505', accent: '#4ADE80',
+    what: "Get the other person to say 'yes' — out loud — at any point during your argument.",
+    hint: 'Ask obvious questions with obvious answers. Lead them gently into agreement.',
+    status: 'active',
+  },
+  {
+    id: 'h40', name: 'THE NOD', icon: '🤝👁️',
+    cardType: 'hazard',
+    bg: '#0F001A', accent: '#C4B5FD',
+    what: 'Argue so compellingly that the other person nods — a genuine, involuntary nod of agreement.',
+    hint: "Build slowly to a point so obvious they cannot help but agree. Don't rush it.",
+    status: 'active',
+  },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -392,6 +555,126 @@ export const COUNTER_CARDS = [
     bg: '#001500', accent: '#4ADE80',
     what: "Redefine the key term in their argument so that their entire case no longer applies.",
     hint: "'The real question is not [their frame] — it is [your frame].' Then argue that.",
+    status: 'active',
+  },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// JOKER CARDS — VS mode only; cancel any hazard placed on you
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Always APPEND — never insert.
+
+export const JOKER_CARDS = [
+  {
+    id: 'j1', name: 'THE WILD CARD', icon: '🃏✨',
+    cardType: 'joker',
+    bg: '#1A1200', accent: '#FFD700',
+    what: 'Cancel any hazard placed on you — argue on your own terms, no restrictions apply.',
+    hint: 'Play when a hazard is active. The hazard is void and you are free.',
+    status: 'active',
+  },
+  {
+    id: 'j2', name: 'THE ESCAPE PLAN', icon: '🚪💨',
+    cardType: 'joker',
+    bg: '#0A001A', accent: '#C084FC',
+    what: "Your opponent's hazard restriction? Not today. Slip free and argue without constraints.",
+    hint: 'Play to nullify the hazard. No restriction, no penalty.',
+    status: 'active',
+  },
+  {
+    id: 'j3', name: 'THE NULLIFIER', icon: '🚫🎴',
+    cardType: 'joker',
+    bg: '#001A1A', accent: '#2DD4BF',
+    what: 'Any hazard played against you is cancelled outright — argue entirely on your own terms.',
+    hint: "Play it. The hazard never happened. Argue freely.",
+    status: 'active',
+  },
+  {
+    id: 'j4', name: 'THE FREE PASS', icon: '🎟️🌟',
+    cardType: 'joker',
+    bg: '#001505', accent: '#4ADE80',
+    what: 'Use this pass to dodge any hazard restriction your opponent placed on you.',
+    hint: 'Free pass activated. No hazard applies to your argument.',
+    status: 'active',
+  },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FILIBUSTER CARDS — VS mode only; skip your debate turn (blocked by hazard)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Always APPEND — never insert.
+
+export const FILIBUSTER_CARDS = [
+  {
+    id: 'fb1', name: 'THE FILIBUSTER', icon: '🗣️⏭️',
+    cardType: 'filibuster',
+    bg: '#0A0A12', accent: '#94A3B8',
+    what: 'Skip your turn to argue — choose not to engage this round.',
+    hint: 'Cannot be played if the opponent placed a hazard on you this turn.',
+    status: 'active',
+  },
+  {
+    id: 'fb2', name: 'THE PROCEDURAL HOLD', icon: '✋📋',
+    cardType: 'filibuster',
+    bg: '#0A0F1A', accent: '#64748B',
+    what: 'Invoke procedure — formally delay and skip your debate turn.',
+    hint: 'Only valid when no hazard is active on your turn.',
+    status: 'active',
+  },
+  {
+    id: 'fb3', name: 'THE WALKOUT', icon: '🚶‍♂️🚪',
+    cardType: 'filibuster',
+    bg: '#0F0020', accent: '#A78BFA',
+    what: 'Walk off the debate floor — skip your argument turn entirely.',
+    hint: 'Requires no active hazard to play.',
+    status: 'active',
+  },
+  {
+    id: 'fb4', name: 'THE ABSTENTION', icon: '🤐🙅',
+    cardType: 'filibuster',
+    bg: '#001A0A', accent: '#6EE7B7',
+    what: 'Formally abstain — choose silence over argument this turn.',
+    hint: 'Cannot be used if a hazard was placed on you this turn.',
+    status: 'active',
+  },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DELEGATE CARDS — VS mode only; opponent argues your side this turn
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Always APPEND — never insert.
+
+export const DELEGATE_CARDS = [
+  {
+    id: 'dg1', name: 'THE PROXY', icon: '📋🔀',
+    cardType: 'delegate',
+    bg: '#1A001A', accent: '#E879F9',
+    what: 'Your opponent argues your side of the case this turn — you pick the brief, they make the case.',
+    hint: 'Optionally hand them one of your move cards to use. Works even with a hazard active.',
+    status: 'active',
+  },
+  {
+    id: 'dg2', name: 'THE SECONDMENT', icon: '🤝📜',
+    cardType: 'delegate',
+    bg: '#001A1A', accent: '#22D3EE',
+    what: 'Second the motion — pass your argument turn to your opponent to argue for you.',
+    hint: 'You may assign a move card as their required technique. Hazards carry over to them.',
+    status: 'active',
+  },
+  {
+    id: 'dg3', name: 'THE ADVOCATE', icon: '⚖️🦅',
+    cardType: 'delegate',
+    bg: '#0A1500', accent: '#86EFAC',
+    what: "Appoint your opponent as your advocate — they must argue your position this turn.",
+    hint: 'Hand them a move card as your brief if you like. Hazards transfer with the turn.',
+    status: 'active',
+  },
+  {
+    id: 'dg4', name: 'THE DELEGATION', icon: '🌐🎖️',
+    cardType: 'delegate',
+    bg: '#1A1200', accent: '#FCD34D',
+    what: "Official delegation — your opponent takes the floor to argue your side.",
+    hint: 'Optionally assign a move card as their required technique. Hazards still apply.',
     status: 'active',
   },
 ];

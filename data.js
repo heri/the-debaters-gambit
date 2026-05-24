@@ -2,12 +2,12 @@
 // Card data lives in cards.js — edit there to add/modify Move and Case Cards.
 
 import { Dimensions } from 'react-native';
-import { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS } from './cards';
+import { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS, JOKER_CARDS, FILIBUSTER_CARDS, DELEGATE_CARDS } from './cards';
 
-export { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS };
+export { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS, JOKER_CARDS, FILIBUSTER_CARDS, DELEGATE_CARDS };
 
-// All cards that can appear in a player's hand during a game.
-export const ALL_PLAY_CARDS = [...MOVE_CARDS, ...HAZARD_CARDS, ...COUNTER_CARDS];
+// All cards that can appear in a player's hand during a VS game.
+export const ALL_PLAY_CARDS = [...MOVE_CARDS, ...HAZARD_CARDS, ...COUNTER_CARDS, ...JOKER_CARDS, ...FILIBUSTER_CARDS, ...DELEGATE_CARDS];
 
 const { width } = Dimensions.get('window');
 
@@ -92,7 +92,7 @@ export function dealCards(historyLength, count = 2) {
   const movePool = historyLength < 10
     ? MOVE_CARDS.filter(c => c.tier === 'BRONZE')
     : MOVE_CARDS;
-  const pool = [...movePool, ...HAZARD_CARDS, ...COUNTER_CARDS];
+  const pool = [...movePool, ...HAZARD_CARDS, ...COUNTER_CARDS, ...JOKER_CARDS, ...FILIBUSTER_CARDS, ...DELEGATE_CARDS];
   const arr = [...pool];
   const n = Math.min(count, arr.length);
   for (let i = 0; i < n; i++) {
@@ -107,7 +107,7 @@ export function drawOneCard(historyLength, excludeIds = []) {
   const movePool = historyLength < 10
     ? MOVE_CARDS.filter(c => c.tier === 'BRONZE')
     : MOVE_CARDS;
-  const pool = [...movePool, ...HAZARD_CARDS, ...COUNTER_CARDS]
+  const pool = [...movePool, ...HAZARD_CARDS, ...COUNTER_CARDS, ...JOKER_CARDS, ...FILIBUSTER_CARDS, ...DELEGATE_CARDS]
     .filter(c => !excludeIds.includes(c.id));
   if (pool.length === 0) return null;
   return pool[Math.floor(Math.random() * pool.length)];

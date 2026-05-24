@@ -840,21 +840,41 @@ export const DebateScreen = ({
     ? Math.min(activeHazard.restrictDebateSecs, debateSecs)
     : debateSecs;
 
-  const moveCards   = hand.filter(c => c.cardType === 'move');
-  const hazardCards = hand.filter(c => c.cardType === 'hazard');
+  const moveCards       = hand.filter(c => c.cardType === 'move');
+  const hazardCards     = hand.filter(c => c.cardType === 'hazard');
+  const jokerCards      = hand.filter(c => c.cardType === 'joker');
+  const filibusterCards = hand.filter(c => c.cardType === 'filibuster');
+  const delegateCards   = hand.filter(c => c.cardType === 'delegate');
 
   const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
-  const [selectedMove,   setSelectedMove]   = useState(null);
-  const [selectedHazard, setSelectedHazard] = useState(null);
+  const [selectedMove,         setSelectedMove]         = useState(null);
+  const [selectedHazard,       setSelectedHazard]       = useState(null);
+  const [selectedJoker,        setSelectedJoker]        = useState(null);
+  const [selectedFilibuster,   setSelectedFilibuster]   = useState(null);
+  const [selectedDelegate,     setSelectedDelegate]     = useState(null);
+  const [selectedDelegateMove, setSelectedDelegateMove] = useState(null);
   const [hazardFollowed, setHazardFollowed] = useState(false);
   const intervalRef = useRef(null);
   const calledRef   = useRef(false);
+
+  const toggleFilibuster = c => {
+    setSelectedFilibuster(prev => prev?.id === c.id ? null : c);
+    setSelectedDelegate(null);
+    setSelectedDelegateMove(null);
+    setSelectedMove(null);
+  };
+  const toggleDelegate = c => {
+    setSelectedDelegate(prev => prev?.id === c.id ? null : c);
+    setSelectedFilibuster(null);
+    setSelectedMove(null);
+    setSelectedDelegateMove(null);
+  };
 
   const finish = (move, followed, timedOut = false) => {
     if (calledRef.current) return;
     calledRef.current = true;
     clearInterval(intervalRef.current);
-    onDone(move, followed, selectedHazard, timedOut);
+    onDone(move, followed, selectedHazard, timedOut, selectedJoker, selectedFilibuster, selectedDelegate, selectedDelegateMove);
   };
 
   useEffect(() => {
@@ -891,7 +911,7 @@ export const DebateScreen = ({
           State your case,{'\n'}{player.name}
         </Text>
 
-        {/* Active hazard restriction banner + compliance confirm */}
+        {/* Active hazard restriction banner + joker cancel OR compliance confirm */}
         {activeHazard ? (
           <>
             <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 10 }}>
@@ -899,49 +919,154 @@ export const DebateScreen = ({
               <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
               <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
             </View>
-            <TouchableOpacity
-              onPress={() => setHazardFollowed(prev => !prev)}
-              activeOpacity={0.8}
-              style={{
-                borderRadius: 12, borderWidth: 2,
-                borderColor: hazardFollowed ? '#4ADE80' : '#6B7280',
-                backgroundColor: hazardFollowed ? '#071A07' : C.surface,
-                padding: 12, marginBottom: 14,
-                flexDirection: 'row', alignItems: 'center', gap: 8,
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>{hazardFollowed ? '✅' : '☐'}</Text>
-              <Text style={{ color: hazardFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
-                {hazardFollowed ? 'HAZARD FOLLOWED' : 'TAP TO CONFIRM: I FOLLOWED THE HAZARD'}
-              </Text>
-            </TouchableOpacity>
+
+            {/* Joker cards — cancel the hazard */}
+            {jokerCards.length > 0 ? (
+              <>
+                <Text style={[S.screenLabel, { marginBottom: 4 }]}>🃏 PLAY A JOKER TO CANCEL</Text>
+                <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to cancel this hazard — or ignore it and follow the hazard below.</Text>
+                {jokerCards.map(card => {
+                  const sel = selectedJoker?.id === card.id;
+                  return (
+                    <TouchableOpacity
+                      key={card.id}
+                      onPress={() => setSelectedJoker(prev => prev?.id === card.id ? null : card)}
+                      activeOpacity={0.88}
+                      style={[
+                        { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                        sel && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+                      ]}
+                    >
+                      <MoveCardView card={card} />
+                      {sel ? (
+                        <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                          <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>🃏 CANCELLING</Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            ) : null}
+
+            {/* Hazard compliance toggle — hidden when joker is active */}
+            {!selectedJoker ? (
+              <TouchableOpacity
+                onPress={() => setHazardFollowed(prev => !prev)}
+                activeOpacity={0.8}
+                style={{
+                  borderRadius: 12, borderWidth: 2,
+                  borderColor: hazardFollowed ? '#4ADE80' : '#6B7280',
+                  backgroundColor: hazardFollowed ? '#071A07' : C.surface,
+                  padding: 12, marginBottom: 14,
+                  flexDirection: 'row', alignItems: 'center', gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>{hazardFollowed ? '✅' : '☐'}</Text>
+                <Text style={{ color: hazardFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+                  {hazardFollowed ? 'HAZARD FOLLOWED' : 'TAP TO CONFIRM: I FOLLOWED THE HAZARD'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ borderRadius: 12, borderWidth: 2, borderColor: '#FFD700', backgroundColor: '#1A1200', padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 16 }}>🃏</Text>
+                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>JOKER ACTIVE — HAZARD CANCELLED</Text>
+              </View>
+            )}
           </>
         ) : null}
 
         <CaseBanner card={caseCard} />
 
-        {/* Move cards in hand */}
+        {/* Filibuster cards — skip turn; only available when no hazard is active */}
+        {!selectedDelegate && filibusterCards.length > 0 && !activeHazard ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 4 }]}>⏭️ OR PLAY A FILIBUSTER</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Skip your debate turn entirely — no argument needed.</Text>
+            {filibusterCards.map(card => {
+              const sel = selectedFilibuster?.id === card.id;
+              return (
+                <TouchableOpacity key={card.id} onPress={() => toggleFilibuster(card)} activeOpacity={0.88}
+                  style={[{ marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                    sel && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } }]}>
+                  <MoveCardView card={card} />
+                  {sel ? (
+                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>⏭️ PLAYING</Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        ) : null}
+
+        {/* Filibuster active banner */}
+        {selectedFilibuster ? (
+          <View style={{ borderRadius: 12, borderWidth: 2, borderColor: selectedFilibuster.accent, backgroundColor: '#0A0A12', padding: 14, marginTop: 8, marginBottom: 8 }}>
+            <Text style={{ color: selectedFilibuster.accent, fontWeight: '900', fontSize: 12, letterSpacing: 1.5, marginBottom: 4 }}>⏭️ FILIBUSTER ACTIVE — TURN SKIPPED</Text>
+            <Text style={{ color: C.muted, fontSize: 12 }}>Your debate turn will be skipped. You may still place a hazard for {nextPlayerName || 'the next player'} below.</Text>
+          </View>
+        ) : null}
+
+        {/* Delegate cards — pass your turn to opponent */}
+        {!selectedFilibuster && delegateCards.length > 0 ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 4 }]}>📋 OR PLAY A DELEGATE</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>
+              {nextPlayerName ? `${nextPlayerName} will argue your side this turn.` : 'Your opponent argues your side this turn.'}
+              {activeHazard ? ' The active hazard carries over to them.' : ''}
+            </Text>
+            {delegateCards.map(card => {
+              const sel = selectedDelegate?.id === card.id;
+              return (
+                <TouchableOpacity key={card.id} onPress={() => toggleDelegate(card)} activeOpacity={0.88}
+                  style={[{ marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                    sel && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } }]}>
+                  <MoveCardView card={card} />
+                  {sel ? (
+                    <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>📋 DELEGATING</Text>
+                    </View>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        ) : null}
+
+        {/* Move cards — own hand (hidden if delegate selected) / brief for opponent (shown if delegate selected) */}
         {moveCards.length > 0 ? (
           <>
-            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>MOVE CARDS</Text>
+            <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 6 }]}>
+              {selectedDelegate ? `GIVE A MOVE CARD TO ${(nextPlayerName || 'OPPONENT').toUpperCase()} (OPTIONAL)` : 'MOVE CARDS'}
+            </Text>
+            {selectedDelegate ? (
+              <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>
+                Pick one from your hand — {nextPlayerName || 'your opponent'} must argue using this technique. Or skip.
+              </Text>
+            ) : null}
             {moveCards.map(card => {
-              const selected = selectedMove?.id === card.id;
-              const dimmed   = selectedMove !== null && !selected;
+              const selected = selectedDelegate
+                ? selectedDelegateMove?.id === card.id
+                : selectedMove?.id === card.id;
+              const dimmed = selectedDelegate
+                ? selectedDelegateMove !== null && !selected
+                : selectedMove !== null && !selected;
+              const onPress = selectedDelegate
+                ? () => setSelectedDelegateMove(prev => prev?.id === card.id ? null : card)
+                : () => toggleMove(card);
               return (
-                <TouchableOpacity
-                  key={card.id}
-                  onPress={() => toggleMove(card)}
-                  activeOpacity={0.88}
-                  style={[
-                    { marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
+                <TouchableOpacity key={card.id} onPress={onPress} activeOpacity={0.88}
+                  style={[{ marginVertical: 6, borderRadius: 22, borderWidth: 2.5, borderColor: 'transparent' },
                     selected && { borderColor: card.accent, shadowColor: card.accent, shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
-                    dimmed && { opacity: 0.4 },
-                  ]}
-                >
+                    dimmed && { opacity: 0.4 }]}>
                   <MoveCardView card={card} />
                   {selected ? (
                     <View style={{ position: 'absolute', top: 14, right: 14, backgroundColor: card.accent, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
-                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>✓ USING</Text>
+                      <Text style={{ color: '#0D0F1C', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+                        {selectedDelegate ? '📋 BRIEFING' : '✓ USING'}
+                      </Text>
                     </View>
                   ) : null}
                 </TouchableOpacity>
@@ -979,6 +1104,130 @@ export const DebateScreen = ({
           </>
         ) : null}
 
+        {activeHazard && !selectedJoker && !selectedDelegate && !hazardFollowed ? (
+          <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
+            <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+              ⚠️ Confirm the hazard above — or play a joker to cancel it, or delegate your turn. Otherwise you'll receive a penalty card.
+            </Text>
+          </View>
+        ) : null}
+        <Btn
+          label={
+            selectedFilibuster ? `⏭️  SKIP TURN${nextPlayerName ? ` — PASS TO ${nextPlayerName.toUpperCase()}` : ''}`
+            : selectedDelegate ? `📋  DELEGATE TO ${(nextPlayerName || 'OPPONENT').toUpperCase()}`
+            : nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}`
+            : '✓  DONE'
+          }
+          onPress={() => finish(selectedDelegate ? null : selectedMove, hazardFollowed)}
+          style={{ marginTop: 12 }}
+        />
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Delegate Debate: opponent argues the delegator's side ────────────────
+// delegatorPlayer: who played the delegate card
+// player:          who is arguing (the opponent)
+// delegateMoveCard: optional move card they must follow
+// activeHazard:    carries over from the delegator's turn
+export const DelegateDebateScreen = ({
+  caseCard, delegatorPlayer, player, delegateMoveCard = null,
+  activeHazard = null, debateSecs = DEFAULT_DEBATE_SECS, onDone,
+}) => {
+  const effectiveSecs = activeHazard?.restrictDebateSecs
+    ? Math.min(activeHazard.restrictDebateSecs, debateSecs)
+    : debateSecs;
+
+  const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
+  const [hazardFollowed, setHazardFollowed] = useState(false);
+  const intervalRef = useRef(null);
+  const calledRef   = useRef(false);
+
+  const finish = (followed) => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    clearInterval(intervalRef.current);
+    onDone(followed);
+  };
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft(prev => {
+        if (prev <= 1) { clearInterval(intervalRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (secondsLeft === 0) finish(hazardFollowed);
+  }, [secondsLeft]);
+
+  const tColor = timerColor(secondsLeft);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ height: 5, backgroundColor: C.border }}>
+        <View style={{ width: effectiveSecs > 0 ? `${Math.round(secondsLeft / effectiveSecs * 100)}%` : '0%', height: 5, backgroundColor: tColor }} />
+      </View>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface }}>
+        <View style={[S.playerChip, { backgroundColor: '#7C3AED' }]}>
+          <Text style={[S.playerChipTxt, { color: '#E8DFC8' }]}>{player.name.toUpperCase()}  ·  DELEGATE  ·  {secondsLeft}s</Text>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={S.scrollContent} showsVerticalScrollIndicator={false}>
+        <Text style={{ fontSize: 22, fontWeight: '900', color: C.muted, textAlign: 'center', letterSpacing: 1, lineHeight: 30, marginTop: 8, marginBottom: 2 }}>
+          Argue {delegatorPlayer.name}'s side,
+        </Text>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: '#E879F9', textAlign: 'center', letterSpacing: 1, lineHeight: 38, marginBottom: 16 }}>
+          {player.name}!
+        </Text>
+
+        {/* Active hazard — carries over from delegator's turn */}
+        {activeHazard ? (
+          <>
+            <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 10 }}>
+              <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
+              <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
+              <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setHazardFollowed(prev => !prev)}
+              activeOpacity={0.8}
+              style={{
+                borderRadius: 12, borderWidth: 2,
+                borderColor: hazardFollowed ? '#4ADE80' : '#6B7280',
+                backgroundColor: hazardFollowed ? '#071A07' : C.surface,
+                padding: 12, marginBottom: 14,
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+              }}
+            >
+              <Text style={{ fontSize: 16 }}>{hazardFollowed ? '✅' : '☐'}</Text>
+              <Text style={{ color: hazardFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+                {hazardFollowed ? 'HAZARD FOLLOWED' : 'TAP TO CONFIRM: I FOLLOWED THE HAZARD'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
+
+        <CaseBanner card={caseCard} />
+
+        {/* Required move card from delegator */}
+        {delegateMoveCard ? (
+          <>
+            <Text style={[S.screenLabel, { marginTop: 20, marginBottom: 6 }]}>📋 YOUR BRIEF FROM {delegatorPlayer.name.toUpperCase()}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>
+              {delegatorPlayer.name} requires you to use this technique in your argument.
+            </Text>
+            <View style={{ borderRadius: 22, borderWidth: 2.5, borderColor: delegateMoveCard.accent }}>
+              <MoveCardView card={delegateMoveCard} />
+            </View>
+          </>
+        ) : null}
+
         {activeHazard && !hazardFollowed ? (
           <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
             <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
@@ -987,8 +1236,8 @@ export const DebateScreen = ({
           </View>
         ) : null}
         <Btn
-          label={nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}` : '✓  DONE'}
-          onPress={() => finish(selectedMove, hazardFollowed)}
+          label={`→  PASS BACK TO ${delegatorPlayer.name.toUpperCase()}`}
+          onPress={() => finish(hazardFollowed)}
           style={{ marginTop: 12 }}
         />
         <View style={{ height: 40 }} />
@@ -1226,14 +1475,15 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
   const hazardCards = hand.filter(c => c.cardType === 'hazard');
   const [secsLeft, setSecsLeft] = useState(30);
   const [selectedHazard, setSelectedHazard] = useState(null);
+  const [counterFollowed, setCounterFollowed] = useState(false);
   const intervalRef = useRef(null);
   const calledRef = useRef(false);
 
-  const finish = () => {
+  const finish = (followed, hazard) => {
     if (calledRef.current) return;
     calledRef.current = true;
     clearInterval(intervalRef.current);
-    onDone(selectedHazard);
+    onDone(followed, hazard);
   };
 
   useEffect(() => {
@@ -1247,7 +1497,7 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
   }, []);
 
   useEffect(() => {
-    if (secsLeft === 0) finish();
+    if (secsLeft === 0) finish(counterFollowed, selectedHazard);
   }, [secsLeft]);
 
   const tColor = timerColor(secsLeft);
@@ -1273,6 +1523,23 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
             <Text style={{ color: '#E8DFC8', fontSize: 14, fontWeight: '600', lineHeight: 22 }}>{counterCard.hint}</Text>
           </View>
         ) : null}
+
+        <TouchableOpacity
+          onPress={() => setCounterFollowed(prev => !prev)}
+          activeOpacity={0.8}
+          style={{
+            borderRadius: 12, borderWidth: 2,
+            borderColor: counterFollowed ? '#4ADE80' : '#6B7280',
+            backgroundColor: counterFollowed ? '#071A07' : C.surface,
+            padding: 12, marginBottom: 14,
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+          }}
+        >
+          <Text style={{ fontSize: 16 }}>{counterFollowed ? '✅' : '☐'}</Text>
+          <Text style={{ color: counterFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
+            {counterFollowed ? 'COUNTER DELIVERED' : 'TAP TO CONFIRM: I DID THE COUNTER'}
+          </Text>
+        </TouchableOpacity>
 
         {hazardCards.length > 0 && nextPlayerName ? (
           <>
@@ -1302,7 +1569,18 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
           </>
         ) : null}
 
-        <Btn label="✓  COUNTER DELIVERED" onPress={finish} style={{ marginTop: 16 }} />
+        {!counterFollowed ? (
+          <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
+            <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
+              ⚠️ Confirm your counter above — otherwise you'll receive a penalty card.
+            </Text>
+          </View>
+        ) : null}
+        <Btn
+          label={nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}` : '✓  DONE'}
+          onPress={() => finish(counterFollowed, selectedHazard)}
+          style={{ marginTop: 12 }}
+        />
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>

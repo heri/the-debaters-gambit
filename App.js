@@ -14,7 +14,7 @@ import { BottomNav } from './components';
 import {
   HomeScreen, HelpScreen, AccountScreen,
   PlayerPickScreen, CasePickScreen, DebateScreen,
-  CounterWindowScreen,
+  DelegateDebateScreen, CounterWindowScreen,
   ComebackScreen, ExchangeScreen, PlayerWinsScreen,
   SoloDojoScreen, QuickDrawScreen,
 } from './screens';
@@ -78,6 +78,10 @@ export default function App() {
   // Hazard queued during a counter-comeback, applied to the opponent's next debate turn
   const [pendingHazardForP1, setPendingHazardForP1] = useState(null);
   const [pendingHazardForP2, setPendingHazardForP2] = useState(null);
+
+  // Delegate card state: move card and hazard passed into the DelegateDebateScreen
+  const [activeDelegateMoveCard, setActiveDelegateMoveCard] = useState(null);
+  const [activeDelegateHazard,   setActiveDelegateHazard]   = useState(null);
 
   // Winner
   const [winningPlayer, setWinningPlayer] = useState(null);
@@ -163,6 +167,7 @@ export default function App() {
     setActiveHazard(null); setActiveCounterCard(null);
     setP1PlayedCard(false); setP2PlayedCard(false);
     setPendingHazardForP1(null); setPendingHazardForP2(null);
+    setActiveDelegateMoveCard(null); setActiveDelegateHazard(null);
     setWinningPlayer(null);
     setCurrentRound(1);
     const firstPhase = mode === 'new_case' ? 'pick_case'
@@ -216,7 +221,7 @@ export default function App() {
     checkWinAndRoute(player2, p2Hand, 'debate_p2');
   };
 
-  const handleP1Done = (moveCard, hazardFollowed, hazardCard, timedOut = false) => {
+  const handleP1Done = (moveCard, hazardFollowed, hazardCard, timedOut = false, jokerCard = null, filibusterCard = null, delegateCard = null, delegateMoveCard = null) => {
     const prevHazard = activeHazard;
     // Hazard for P2's next debate: P1's inline pick, or fallback to pending hazard from P2's comeback
     const nextHazardForP2 = hazardCard || pendingHazardForP2 || null;
@@ -224,46 +229,89 @@ export default function App() {
     setPendingHazardForP2(null);
 
     let newHand = p1Hand;
-    if (moveCard)   newHand = newHand.filter(c => c.id !== moveCard.id);
-    if (hazardCard) newHand = newHand.filter(c => c.id !== hazardCard.id);
+    if (moveCard)         newHand = newHand.filter(c => c.id !== moveCard.id);
+    if (hazardCard)       newHand = newHand.filter(c => c.id !== hazardCard.id);
+    if (jokerCard)        newHand = newHand.filter(c => c.id !== jokerCard.id);
+    if (filibusterCard)   newHand = newHand.filter(c => c.id !== filibusterCard.id);
+    if (delegateCard)     newHand = newHand.filter(c => c.id !== delegateCard.id);
+    if (delegateMoveCard) newHand = newHand.filter(c => c.id !== delegateMoveCard.id);
 
-    if (prevHazard && !hazardFollowed) {
+    const isSpecialPlay = !!(filibusterCard || delegateCard);
+    if (prevHazard && !hazardFollowed && !jokerCard && !isSpecialPlay) {
       const penalty = drawOneCard(history.length, newHand.map(c => c.id));
       if (penalty) newHand = [...newHand, penalty];
     }
-    if (timedOut) {
+    if (timedOut && !isSpecialPlay) {
       const penalty = drawOneCard(history.length, newHand.map(c => c.id));
       if (penalty) newHand = [...newHand, penalty];
     }
     setP1Hand(newHand);
 
-    const played = !!(moveCard || hazardCard);
-    setP1PlayedCard(played);
+    const played = !!(moveCard || hazardCard || jokerCard || filibusterCard || delegateCard);
+    const skipExchange = played || p1PlayedCard;
+    setP1PlayedCard(skipExchange);
     setPhoneHolder('p2');
 
+    if (delegateCard) {
+      // Delegate: P2 argues P1's side; hazard (if not joker-cancelled) carries over
+      setActiveDelegateMoveCard(delegateMoveCard || null);
+      setActiveDelegateHazard(jokerCard ? null : prevHazard);
+      setGamePhase('delegate_debate_p1');
+      return;
+    }
+
+    if (filibusterCard) {
+      // Filibuster: skip debate — no counter window (nothing to counter)
+      checkWinAndRoute(player2, p2Hand, 'debate_p2');
+      return;
+    }
+
+    // Normal post-debate routing
     // P2 cannot counter if a hazard was just placed on them
     const unusedCounters = (!nextHazardForP2) ? p2Hand.filter(c => c.cardType === 'counter') : [];
     if (unusedCounters.length > 0) {
       setGamePhase('counter_window_p2');
-    } else if (played) {
+    } else if (skipExchange) {
       checkWinAndRoute(player2, p2Hand, 'debate_p2');
     } else {
       setGamePhase('exchange_p1');
     }
   };
 
+  // delegate_debate_p1: P2 argued P1's side → end P1's turn
+  const handleDelegateP1Done = (hazardFollowed) => {
+    let newP2Hand = p2Hand;
+    if (activeDelegateHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, newP2Hand.map(c => c.id));
+      if (penalty) newP2Hand = [...newP2Hand, penalty];
+    }
+    setP2Hand(newP2Hand);
+    setActiveDelegateMoveCard(null);
+    setActiveDelegateHazard(null);
+    setPhoneHolder('p1');
+    // P1 played a delegate card (skipExchange already true) — go straight to P2's debate
+    checkWinAndRoute(player2, newP2Hand, 'debate_p2');
+  };
+
   const handleP2CounterPlay = (card) => {
     setActiveCounterCard(card);
     setP2Hand(prev => prev.filter(c => c.id !== card.id));
+    setP2PlayedCard(true); // playing a counter counts as playing a card — blocks exchange
     setGamePhase('comeback_p2'); // P2 (who played the counter) delivers it
   };
 
   // comeback_p1 = P1 delivered their counter against P2's argument → end P2's turn
-  const handleComebackP1Done = (hazardCard) => {
+  const handleComebackP1Done = (counterFollowed, hazardCard) => {
+    let newP1Hand = p1Hand;
+    if (!counterFollowed) {
+      const penalty = drawOneCard(history.length, newP1Hand.map(c => c.id));
+      if (penalty) newP1Hand = [...newP1Hand, penalty];
+    }
     if (hazardCard) {
-      setP1Hand(prev => prev.filter(c => c.id !== hazardCard.id));
+      newP1Hand = newP1Hand.filter(c => c.id !== hazardCard.id);
       setPendingHazardForP2(hazardCard); // applied to P2's next debate via handleP1Done
     }
+    setP1Hand(newP1Hand);
     setActiveCounterCard(null);
     setPhoneHolder('p1');
     if (p2PlayedCard) { endP2Turn(); } else { setGamePhase('exchange_p2'); }
@@ -287,7 +335,7 @@ export default function App() {
     checkWinAndRoute(player1, p1Hand, 'debate_p1');
   };
 
-  const handleP2Done = (moveCard, hazardFollowed, hazardCard, timedOut = false) => {
+  const handleP2Done = (moveCard, hazardFollowed, hazardCard, timedOut = false, jokerCard = null, filibusterCard = null, delegateCard = null, delegateMoveCard = null) => {
     const prevHazard = activeHazard;
     // Hazard for P1's next debate: P2's inline pick, or fallback to pending hazard from P1's comeback
     const nextHazardForP1 = hazardCard || pendingHazardForP1 || null;
@@ -295,28 +343,48 @@ export default function App() {
     setPendingHazardForP1(null);
 
     let newHand = p2Hand;
-    if (moveCard)   newHand = newHand.filter(c => c.id !== moveCard.id);
-    if (hazardCard) newHand = newHand.filter(c => c.id !== hazardCard.id);
+    if (moveCard)         newHand = newHand.filter(c => c.id !== moveCard.id);
+    if (hazardCard)       newHand = newHand.filter(c => c.id !== hazardCard.id);
+    if (jokerCard)        newHand = newHand.filter(c => c.id !== jokerCard.id);
+    if (filibusterCard)   newHand = newHand.filter(c => c.id !== filibusterCard.id);
+    if (delegateCard)     newHand = newHand.filter(c => c.id !== delegateCard.id);
+    if (delegateMoveCard) newHand = newHand.filter(c => c.id !== delegateMoveCard.id);
 
-    if (prevHazard && !hazardFollowed) {
+    const isSpecialPlay = !!(filibusterCard || delegateCard);
+    if (prevHazard && !hazardFollowed && !jokerCard && !isSpecialPlay) {
       const penalty = drawOneCard(history.length, newHand.map(c => c.id));
       if (penalty) newHand = [...newHand, penalty];
     }
-    if (timedOut) {
+    if (timedOut && !isSpecialPlay) {
       const penalty = drawOneCard(history.length, newHand.map(c => c.id));
       if (penalty) newHand = [...newHand, penalty];
     }
     setP2Hand(newHand);
 
-    const played = !!(moveCard || hazardCard);
-    setP2PlayedCard(played);
+    const played = !!(moveCard || hazardCard || jokerCard || filibusterCard || delegateCard);
+    const skipExchange = played || p2PlayedCard;
+    setP2PlayedCard(skipExchange);
     setPhoneHolder('p1');
 
+    if (delegateCard) {
+      setActiveDelegateMoveCard(delegateMoveCard || null);
+      setActiveDelegateHazard(jokerCard ? null : prevHazard);
+      setGamePhase('delegate_debate_p2');
+      return;
+    }
+
+    if (filibusterCard) {
+      setCurrentRound(r => r + 1);
+      checkWinAndRoute(player1, p1Hand, 'debate_p1');
+      return;
+    }
+
+    // Normal post-debate routing
     // P1 cannot counter if a hazard was just placed on them
     const unusedCounters = (!nextHazardForP1) ? p1Hand.filter(c => c.cardType === 'counter') : [];
     if (unusedCounters.length > 0) {
       setGamePhase('counter_window_p1');
-    } else if (played) {
+    } else if (skipExchange) {
       setCurrentRound(r => r + 1);
       checkWinAndRoute(player1, p1Hand, 'debate_p1');
     } else {
@@ -324,18 +392,41 @@ export default function App() {
     }
   };
 
+  // delegate_debate_p2: P1 argued P2's side → end P2's turn
+  const handleDelegateP2Done = (hazardFollowed) => {
+    let newP1Hand = p1Hand;
+    if (activeDelegateHazard && !hazardFollowed) {
+      const penalty = drawOneCard(history.length, newP1Hand.map(c => c.id));
+      if (penalty) newP1Hand = [...newP1Hand, penalty];
+    }
+    setP1Hand(newP1Hand);
+    setActiveDelegateMoveCard(null);
+    setActiveDelegateHazard(null);
+    setPhoneHolder('p2');
+    setCurrentRound(r => r + 1);
+    // P2 played a delegate card (skipExchange already true) — go straight to P1's debate
+    checkWinAndRoute(player1, newP1Hand, 'debate_p1');
+  };
+
   const handleP1CounterPlay = (card) => {
     setActiveCounterCard(card);
     setP1Hand(prev => prev.filter(c => c.id !== card.id));
+    setP1PlayedCard(true); // playing a counter counts as playing a card — blocks exchange
     setGamePhase('comeback_p1'); // P1 (who played the counter) delivers it
   };
 
   // comeback_p2 = P2 delivered their counter against P1's argument → end P1's turn
-  const handleComebackP2Done = (hazardCard) => {
+  const handleComebackP2Done = (counterFollowed, hazardCard) => {
+    let newP2Hand = p2Hand;
+    if (!counterFollowed) {
+      const penalty = drawOneCard(history.length, newP2Hand.map(c => c.id));
+      if (penalty) newP2Hand = [...newP2Hand, penalty];
+    }
     if (hazardCard) {
-      setP2Hand(prev => prev.filter(c => c.id !== hazardCard.id));
+      newP2Hand = newP2Hand.filter(c => c.id !== hazardCard.id);
       setPendingHazardForP1(hazardCard); // applied to P1's next debate via handleP2Done
     }
+    setP2Hand(newP2Hand);
     setActiveCounterCard(null);
     setPhoneHolder('p2');
     if (p1PlayedCard) { endP1Turn(); } else { setGamePhase('exchange_p1'); }
@@ -457,6 +548,20 @@ export default function App() {
           />
         );
 
+      case 'delegate_debate_p1':
+        return (
+          <DelegateDebateScreen
+            key={`delegate-p1-round${currentRound}`}
+            caseCard={selectedCase}
+            delegatorPlayer={player1}
+            player={player2}
+            delegateMoveCard={activeDelegateMoveCard}
+            activeHazard={activeDelegateHazard}
+            debateSecs={debateSecs}
+            onDone={handleDelegateP1Done}
+          />
+        );
+
       case 'counter_window_p2': {
         const unusedCounters = p2Hand.filter(c => c.cardType === 'counter');
         return (
@@ -501,6 +606,20 @@ export default function App() {
             activeHazard={activeHazard}
             debateSecs={debateSecs}
             onDone={gameMode === 'daily' ? handleP2DoneDaily : handleP2Done}
+          />
+        );
+
+      case 'delegate_debate_p2':
+        return (
+          <DelegateDebateScreen
+            key={`delegate-p2-round${currentRound}`}
+            caseCard={selectedCase}
+            delegatorPlayer={player2}
+            player={player1}
+            delegateMoveCard={activeDelegateMoveCard}
+            activeHazard={activeDelegateHazard}
+            debateSecs={debateSecs}
+            onDone={handleDelegateP2Done}
           />
         );
 
