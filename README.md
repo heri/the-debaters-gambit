@@ -247,7 +247,41 @@ argus_expressions.png ← 6-expression sprite (Confident/Suspicious/etc.)
 
 **To add a move card:** append to `MOVE_CARDS` in `cards.js` + add a matching entry to `drills.js`. Always **append** — inserting changes index positions and breaks the daily seed for that date.
 
-**To add a case card:** append to `CASE_CARDS` in `cards.js` only.
+**To add a case card (bundled):** append to `CASE_CARDS` in `cards.js` only.
+
+**To add a case card (remote — no app update needed):**
+
+1. Edit `content/cards.json` in this repo (or directly in the hosting repo):
+   ```json
+   {
+     "label": "✨ New Cases",
+     "version": 2,
+     "case_cards": [
+       {
+         "id": "rc8",
+         "title": "Your new case title",
+         "description": "One sentence framing the debate.",
+         "difficulty": "EASY",
+         "icon": "🎃",
+         "focus": "Optional theme label"
+       }
+     ]
+   }
+   ```
+2. Push `cards.json` to the hosting repo (currently `heri/studiozenkai.com` on GitHub).
+3. jsDelivr propagates in **5–10 minutes**. To purge the CDN cache immediately:
+   ```
+   https://purge.jsdelivr.net/gh/heri/studiozenkai.com/cards.json
+   ```
+4. The app fetches on startup and caches for **24 hours**. A fresh launch after the TTL expires picks up new cards automatically.
+
+Cards with `id` values that already exist in `cards.js` are deduplicated — remote cards never override bundled ones.
+
+The remote URL is configured in `.env`:
+```
+EXPO_PUBLIC_REMOTE_CARDS_URL=https://cdn.jsdelivr.net/gh/heri/studiozenkai.com/cards.json
+```
+Change this value if the JSON moves to a different host.
 
 ---
 

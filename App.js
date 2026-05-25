@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
-import { uid, DEFAULT_DEBATE_SECS, getDailyDraw, dealCards, drawOneCard } from './data';
+import { uid, DEFAULT_DEBATE_SECS, getDailyDraw, dealCards, drawOneCard, fetchRemoteCards, getMergedCases } from './data';
 import { S } from './styles';
 import { BottomNav } from './components';
 import {
@@ -92,6 +92,7 @@ export default function App() {
 
   const [history, setHistory] = useState([]);
   const [completedDrills, setCompletedDrills] = useState([]);
+  const [remoteCards, setRemoteCards] = useState(null);
 
   const dailyDraw = useMemo(() => getDailyDraw(), []);
 
@@ -120,6 +121,7 @@ export default function App() {
       if (completedDrillsRaw) setCompletedDrills(JSON.parse(completedDrillsRaw));
 
       setIsReady(true);
+      fetchRemoteCards().then(remote => { if (remote) setRemoteCards(remote); }).catch(() => {});
     }).catch(() => setIsReady(true));
   }, []);
 
@@ -279,9 +281,9 @@ export default function App() {
   };
 
   // delegate_debate_p1: P2 argued P1's side → end P1's turn
-  const handleDelegateP1Done = (hazardFollowed) => {
+  const handleDelegateP1Done = (confirmed) => {
     let newP2Hand = p2Hand;
-    if (activeDelegateHazard && !hazardFollowed) {
+    if (!confirmed) {
       const penalty = drawOneCard(history.length, newP2Hand.map(c => c.id));
       if (penalty) newP2Hand = [...newP2Hand, penalty];
     }
@@ -289,7 +291,6 @@ export default function App() {
     setActiveDelegateMoveCard(null);
     setActiveDelegateHazard(null);
     setPhoneHolder('p1');
-    // P1 played a delegate card (skipExchange already true) — go straight to P2's debate
     checkWinAndRoute(player2, newP2Hand, 'debate_p2');
   };
 
@@ -393,9 +394,9 @@ export default function App() {
   };
 
   // delegate_debate_p2: P1 argued P2's side → end P2's turn
-  const handleDelegateP2Done = (hazardFollowed) => {
+  const handleDelegateP2Done = (confirmed) => {
     let newP1Hand = p1Hand;
-    if (activeDelegateHazard && !hazardFollowed) {
+    if (!confirmed) {
       const penalty = drawOneCard(history.length, newP1Hand.map(c => c.id));
       if (penalty) newP1Hand = [...newP1Hand, penalty];
     }
@@ -404,7 +405,6 @@ export default function App() {
     setActiveDelegateHazard(null);
     setPhoneHolder('p2');
     setCurrentRound(r => r + 1);
-    // P2 played a delegate card (skipExchange already true) — go straight to P1's debate
     checkWinAndRoute(player1, newP1Hand, 'debate_p1');
   };
 
@@ -522,6 +522,8 @@ export default function App() {
         return (
           <CasePickScreen
             players={players}
+            cases={getMergedCases(remoteCards?.case_cards)}
+            remoteLabel={remoteCards?.label ?? null}
             onConfirm={(card, p1, p2) => {
               setSelectedCase(card);
               setPlayer1(p1); setPlayer2(p2);
@@ -557,7 +559,6 @@ export default function App() {
             player={player2}
             delegateMoveCard={activeDelegateMoveCard}
             activeHazard={activeDelegateHazard}
-            debateSecs={debateSecs}
             onDone={handleDelegateP1Done}
           />
         );
@@ -618,7 +619,6 @@ export default function App() {
             player={player1}
             delegateMoveCard={activeDelegateMoveCard}
             activeHazard={activeDelegateHazard}
-            debateSecs={debateSecs}
             onDone={handleDelegateP2Done}
           />
         );

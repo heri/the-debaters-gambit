@@ -4,7 +4,7 @@ import {
   TextInput, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CARD_W, DEFAULT_DEBATE_SECS, MOVE_CARDS, sortedCases, formatTime, timerColor } from './data';
+import { CARD_W, DEFAULT_DEBATE_SECS, MOVE_CARDS, sortedCases, getMergedCases, formatTime, timerColor } from './data';
 import { DRILLS, DRILLS_LEGACY } from './drills';
 import { C, S } from './styles';
 import { Btn, ToggleRow, MoveCardView, CaseCardView, CaseBanner, HandPanel } from './components';
@@ -262,20 +262,25 @@ export const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>1</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Choose a Case</Text> — the debate topic both players will argue.
-        Use the dropdowns below the case card to select who is playing.
+        <Text style={{ color: C.gold }}>Choose a Case</Text> — pick the debate topic and select both players from the dropdowns. The first player listed argues first.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt 3 cards: move cards, hazard cards, and counter cards. Beginners get BRONZE move cards. Cards are played across three phases each turn.
+        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt cards from the full deck. There are six types:{'\n'}
+        {'  '}⚔️  <Text style={{ color: C.gold }}>Move cards</Text> — rhetorical techniques (Fair Play, Honest Tale…). Play one during your argument turn.{'\n'}
+        {'  '}⚡  <Text style={{ color: C.gold }}>Hazard cards</Text> — played against your opponent before their turn to restrict how they argue.{'\n'}
+        {'  '}🛡️  <Text style={{ color: C.gold }}>Counter cards</Text> — interrupt your opponent after they argue and deliver a rebuttal.{'\n'}
+        {'  '}🃏  <Text style={{ color: C.gold }}>Joker cards</Text> — cancel a hazard that was played against you, freeing you to argue without the restriction.{'\n'}
+        {'  '}⏭️  <Text style={{ color: C.gold }}>Filibuster cards</Text> — skip your turn entirely. Can only be played if your opponent did not play a hazard against you.{'\n'}
+        {'  '}📋  <Text style={{ color: C.gold }}>Delegate cards</Text> — your opponent must argue your side of the case for your turn. You can also hand them a move card they must follow. Works even if a hazard is active.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Each turn has three phases</Text> — (1) Hazard Window: your opponent plays a hazard card to restrict your argument. (2) Argument: you debate and optionally play a move card. (3) Counter Window: your opponent has 15 seconds to play a counter card and interrupt with a rebuttal — then you get a 30-second comeback. At end of turn you may exchange one card.
+        <Text style={{ color: C.gold }}>Each turn has three phases</Text> — (1) <Text style={{ color: C.gold }}>Hazard Window</Text>: opponent may play a hazard card against you. (2) <Text style={{ color: C.gold }}>Argument</Text>: you debate and choose how to play — a move card, a joker to cancel the hazard, a filibuster to skip your turn, or a delegate card to pass your turn to your opponent. (3) <Text style={{ color: C.gold }}>Counter Window</Text>: opponent has 15 seconds to play a counter card for a rebuttal — then you get a 30-second comeback. At end of turn you may exchange one card.
       </Text>
     </View>
     <View style={S.helpRule}>
@@ -557,7 +562,7 @@ export const PlayerPickScreen = ({ players, onConfirm }) => {
 // players: all registered players
 // onConfirm(caseCard, p1, p2) — called when user locks in their choice
 
-export const CasePickScreen = ({ players, onConfirm }) => {
+export const CasePickScreen = ({ players, onConfirm, cases = sortedCases, remoteLabel = null }) => {
   const [idx, setIdx] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [p1, setP1] = useState(players.length > 0 ? players[0] : null);
@@ -592,7 +597,7 @@ export const CasePickScreen = ({ players, onConfirm }) => {
   };
 
   const goNext = () => {
-    if (!isSpinning && idx < sortedCases.length - 1) slide(1, () => setIdx(i => i + 1));
+    if (!isSpinning && idx < cases.length - 1) slide(1, () => setIdx(i => i + 1));
   };
   const goPrev = () => {
     if (!isSpinning && idx > 0) slide(-1, () => setIdx(i => i - 1));
@@ -608,14 +613,14 @@ export const CasePickScreen = ({ players, onConfirm }) => {
 
   const handleRandom = () => {
     if (isSpinning) return;
-    const targetIdx = Math.floor(Math.random() * sortedCases.length);
-    const stepsToTarget = (targetIdx - idx + sortedCases.length) % sortedCases.length;
-    const totalSteps = 2 * sortedCases.length + (stepsToTarget || sortedCases.length);
+    const targetIdx = Math.floor(Math.random() * cases.length);
+    const stepsToTarget = (targetIdx - idx + cases.length) % cases.length;
+    const totalSteps = 2 * cases.length + (stepsToTarget || cases.length);
     let step = 0; let cur = idx;
     setIsSpinning(true);
     const spin = () => {
       if (!isMounted.current) return;
-      cur = (cur + 1) % sortedCases.length;
+      cur = (cur + 1) % cases.length;
       setIdx(cur); step++;
       if (step < totalSteps) {
         const progress = step / totalSteps;
@@ -630,49 +635,32 @@ export const CasePickScreen = ({ players, onConfirm }) => {
 
   const canConfirm = p1 && p2 && p1.id !== p2.id;
 
+  const speaksFirstHint = p1 && p2
+    ? `${p1.name} speaks first, then ${p2.name}`
+    : 'Select both players to begin';
+
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={S.browserHeader}>
         <Text style={S.screenTitle}>CHOOSE A CASE</Text>
+        {remoteLabel ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 6 }}>
+            <View style={{ backgroundColor: '#0D2F2C', borderWidth: 1, borderColor: '#2ECFB0', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 }}>
+              <Text style={{ color: '#2ECFB0', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 }}>✨ {remoteLabel.toUpperCase()}</Text>
+            </View>
+          </View>
+        ) : null}
         <View style={S.dots}>
-          {sortedCases.map((_, i) => (
+          {cases.map((_, i) => (
             <View key={i} style={[S.dot, i === idx && S.dotActive]} />
           ))}
         </View>
       </View>
 
       <ScrollView contentContainerStyle={S.scrollContent} showsVerticalScrollIndicator={false}>
-        <Animated.View
-          style={{ transform: [{ translateX }], width: CARD_W }}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
-          <CaseCardView card={sortedCases[idx]} />
-        </Animated.View>
 
-        <View style={S.navRow}>
-          <TouchableOpacity
-            onPress={goPrev}
-            disabled={idx === 0 || isSpinning}
-            style={[S.navArrow, (idx === 0 || isSpinning) && { opacity: 0.25 }]}
-          >
-            <Text style={S.navArrowTxt}>‹  PREV</Text>
-          </TouchableOpacity>
-          <Text style={S.navCounter}>{idx + 1} / {sortedCases.length}</Text>
-          <TouchableOpacity
-            onPress={goNext}
-            disabled={idx === sortedCases.length - 1 || isSpinning}
-            style={[S.navArrow, (idx === sortedCases.length - 1 || isSpinning) && { opacity: 0.25 }]}
-          >
-            <Text style={S.navArrowTxt}>NEXT  ›</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ width: CARD_W, marginTop: 12 }}>
-          <Text style={[S.hint, { marginBottom: 12, textAlign: 'center' }]}>
-            Player 1 speaks first, then Player 2
-          </Text>
-
+        {/* Player selection — at the top so players are set before browsing */}
+        <View style={{ width: CARD_W, marginBottom: 16 }}>
           <Text style={S.playerSelectorLabel}>PLAYER 1</Text>
           <TouchableOpacity
             style={S.playerSelectorBtn}
@@ -693,7 +681,7 @@ export const CasePickScreen = ({ players, onConfirm }) => {
             </TouchableOpacity>
           )) : null}
 
-          <View style={{ height: 12 }} />
+          <View style={{ height: 10 }} />
 
           <Text style={S.playerSelectorLabel}>PLAYER 2</Text>
           <TouchableOpacity
@@ -714,11 +702,39 @@ export const CasePickScreen = ({ players, onConfirm }) => {
               <Text style={S.playerSelectorOptionTxt}>{p.name}</Text>
             </TouchableOpacity>
           )) : null}
+
+          <Text style={[S.hint, { marginTop: 10, textAlign: 'center' }]}>{speaksFirstHint}</Text>
+        </View>
+
+        <Animated.View
+          style={{ transform: [{ translateX }], width: CARD_W }}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
+          <CaseCardView card={cases[idx]} />
+        </Animated.View>
+
+        <View style={S.navRow}>
+          <TouchableOpacity
+            onPress={goPrev}
+            disabled={idx === 0 || isSpinning}
+            style={[S.navArrow, (idx === 0 || isSpinning) && { opacity: 0.25 }]}
+          >
+            <Text style={S.navArrowTxt}>‹  PREV</Text>
+          </TouchableOpacity>
+          <Text style={S.navCounter}>{idx + 1} / {cases.length}</Text>
+          <TouchableOpacity
+            onPress={goNext}
+            disabled={idx === cases.length - 1 || isSpinning}
+            style={[S.navArrow, (idx === cases.length - 1 || isSpinning) && { opacity: 0.25 }]}
+          >
+            <Text style={S.navArrowTxt}>NEXT  ›</Text>
+          </TouchableOpacity>
         </View>
 
         <Btn
           label="✓  CHOOSE THIS CASE"
-          onPress={() => onConfirm(sortedCases[idx], p1, p2)}
+          onPress={() => onConfirm(cases[idx], p1, p2)}
           disabled={isSpinning || !canConfirm}
           style={{ marginTop: 16 }}
         />
@@ -1131,51 +1147,25 @@ export const DebateScreen = ({
 // delegatorPlayer: who played the delegate card
 // player:          who is arguing (the opponent)
 // delegateMoveCard: optional move card they must follow
-// activeHazard:    carries over from the delegator's turn
+// activeHazard:    carries over from the delegator's turn (shown for info)
+// onDone(confirmed): true = argued successfully, false = declined (penalty card dealt by handler)
 export const DelegateDebateScreen = ({
   caseCard, delegatorPlayer, player, delegateMoveCard = null,
-  activeHazard = null, debateSecs = DEFAULT_DEBATE_SECS, onDone,
+  activeHazard = null, onDone,
 }) => {
-  const effectiveSecs = activeHazard?.restrictDebateSecs
-    ? Math.min(activeHazard.restrictDebateSecs, debateSecs)
-    : debateSecs;
+  const calledRef = useRef(false);
 
-  const [secondsLeft, setSecondsLeft] = useState(effectiveSecs);
-  const [hazardFollowed, setHazardFollowed] = useState(false);
-  const intervalRef = useRef(null);
-  const calledRef   = useRef(false);
-
-  const finish = (followed) => {
+  const finish = (confirmed) => {
     if (calledRef.current) return;
     calledRef.current = true;
-    clearInterval(intervalRef.current);
-    onDone(followed);
+    onDone(confirmed);
   };
-
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev <= 1) { clearInterval(intervalRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(intervalRef.current);
-  }, []);
-
-  useEffect(() => {
-    if (secondsLeft === 0) finish(hazardFollowed);
-  }, [secondsLeft]);
-
-  const tColor = timerColor(secondsLeft);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ height: 5, backgroundColor: C.border }}>
-        <View style={{ width: effectiveSecs > 0 ? `${Math.round(secondsLeft / effectiveSecs * 100)}%` : '0%', height: 5, backgroundColor: tColor }} />
-      </View>
       <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface }}>
         <View style={[S.playerChip, { backgroundColor: '#7C3AED' }]}>
-          <Text style={[S.playerChipTxt, { color: '#E8DFC8' }]}>{player.name.toUpperCase()}  ·  DELEGATE  ·  {secondsLeft}s</Text>
+          <Text style={[S.playerChipTxt, { color: '#E8DFC8' }]}>{player.name.toUpperCase()}  ·  DELEGATE</Text>
         </View>
       </View>
       <ScrollView contentContainerStyle={S.scrollContent} showsVerticalScrollIndicator={false}>
@@ -1186,31 +1176,13 @@ export const DelegateDebateScreen = ({
           {player.name}!
         </Text>
 
-        {/* Active hazard — carries over from delegator's turn */}
+        {/* Active hazard — carries over from delegator's turn, shown for reference */}
         {activeHazard ? (
-          <>
-            <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 10 }}>
-              <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
-              <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
-              <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setHazardFollowed(prev => !prev)}
-              activeOpacity={0.8}
-              style={{
-                borderRadius: 12, borderWidth: 2,
-                borderColor: hazardFollowed ? '#4ADE80' : '#6B7280',
-                backgroundColor: hazardFollowed ? '#071A07' : C.surface,
-                padding: 12, marginBottom: 14,
-                flexDirection: 'row', alignItems: 'center', gap: 8,
-              }}
-            >
-              <Text style={{ fontSize: 16 }}>{hazardFollowed ? '✅' : '☐'}</Text>
-              <Text style={{ color: hazardFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
-                {hazardFollowed ? 'HAZARD FOLLOWED' : 'TAP TO CONFIRM: I FOLLOWED THE HAZARD'}
-              </Text>
-            </TouchableOpacity>
-          </>
+          <View style={{ backgroundColor: '#2A1000', borderRadius: 12, borderWidth: 1.5, borderColor: activeHazard.accent, padding: 14, marginBottom: 14 }}>
+            <Text style={{ color: activeHazard.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>⚡ HAZARD IN EFFECT</Text>
+            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 15, marginBottom: 4 }}>{activeHazard.name}</Text>
+            <Text style={{ color: '#E8DFC8', fontSize: 13, opacity: 0.85 }}>{activeHazard.what}</Text>
+          </View>
         ) : null}
 
         <CaseBanner card={caseCard} />
@@ -1228,18 +1200,20 @@ export const DelegateDebateScreen = ({
           </>
         ) : null}
 
-        {activeHazard && !hazardFollowed ? (
-          <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
-            <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
-              ⚠️ Confirm the hazard above before passing — otherwise you'll receive a penalty card.
-            </Text>
-          </View>
-        ) : null}
         <Btn
-          label={`→  PASS BACK TO ${delegatorPlayer.name.toUpperCase()}`}
-          onPress={() => finish(hazardFollowed)}
-          style={{ marginTop: 12 }}
+          label="✓  I PLAYED DELEGATE CARD"
+          onPress={() => finish(true)}
+          style={{ marginTop: 20 }}
         />
+        <Btn
+          label="✗  I CANNOT PLAY DELEGATE CARD"
+          variant="secondary"
+          onPress={() => finish(false)}
+          style={{ marginTop: 8 }}
+        />
+        <Text style={{ color: C.muted, fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 18 }}>
+          Declining will add a random card to your hand.
+        </Text>
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>

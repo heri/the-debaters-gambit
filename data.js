@@ -2,6 +2,7 @@
 // Card data lives in cards.js — edit there to add/modify Move and Case Cards.
 
 import { Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS, JOKER_CARDS, FILIBUSTER_CARDS, DELEGATE_CARDS } from './cards';
 
 export { MOVE_CARDS, CASE_CARDS, HAZARD_CARDS, COUNTER_CARDS, JOKER_CARDS, FILIBUSTER_CARDS, DELEGATE_CARDS };
@@ -100,6 +101,49 @@ export function dealCards(historyLength, count = 2) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr.slice(0, n);
+}
+
+// ── Remote cards (dynamic case cards via CDN) ─────────────────────────────
+// Fetches JSON from EXPO_PUBLIC_REMOTE_CARDS_URL and caches it in AsyncStorage
+// for 24 hours. Returns the parsed object or null on failure.
+const REMOTE_CACHE_KEY = 'remote_cards_cache_v1';
+const REMOTE_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+export async function fetchRemoteCards() {
+  try {
+    const cached = await AsyncStorage.getItem(REMOTE_CACHE_KEY);
+    if (cached) {
+      const { ts, data } = JSON.parse(cached);
+      if (Date.now() - ts < REMOTE_CACHE_TTL) return data;
+    }
+  } catch (_) {}
+
+  const url = process.env.EXPO_PUBLIC_REMOTE_CARDS_URL;
+  if (!url) return null;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('non-200');
+    const data = await res.json();
+    await AsyncStorage.setItem(REMOTE_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+    return data;
+  } catch (_) {
+    // Return stale cache as fallback
+    try {
+      const cached = await AsyncStorage.getItem(REMOTE_CACHE_KEY);
+      if (cached) return JSON.parse(cached).data;
+    } catch (_2) {}
+    return null;
+  }
+}
+
+// Merges bundled case cards with remote ones (deduped by id), sorted by difficulty.
+export function getMergedCases(remoteCaseCards = []) {
+  if (!remoteCaseCards || remoteCaseCards.length === 0) return sortedCases;
+  const existingIds = new Set(CASE_CARDS.map(c => c.id));
+  const newRemote = remoteCaseCards.filter(c => !existingIds.has(c.id));
+  const merged = [...CASE_CARDS, ...newRemote];
+  return merged.sort((a, b) => (DIFF_ORDER[a.difficulty] ?? 1) - (DIFF_ORDER[b.difficulty] ?? 1));
 }
 
 // Draw a single replacement card, excluding cards already in hand.
