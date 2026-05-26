@@ -214,7 +214,17 @@ The game speaks like a sparring partner, not a teacher.
 
 ---
 
+## Monorepo Structure
+
+```
+the-debater-gambit/
+├── front-end/    ← React Native / Expo app
+└── back-end/     ← Phoenix API (Elixir + SQLite)
+```
+
 ## Tech Stack
+
+### Front-end
 
 | Layer | Choice | Why |
 |---|---|---|
@@ -223,26 +233,58 @@ The game speaks like a sparring partner, not a teacher.
 | Navigation | **Custom state machine** (`gamePhase`) | No dependency overhead for a linear flow |
 | Animation | **React Native `Animated` API** | Built-in; powers card slide transitions and random spin |
 | Persistence | **AsyncStorage** | Players, settings, completed drills, and game history survive app restarts |
-| Voice (optional) | **expo-av** | Microphone recording during debate turns; gracefully absent if not installed |
 | Styling | **StyleSheet** | Native performance; no third-party UI lib |
 | Safe area | **react-native-safe-area-context** | Correct notch/Dynamic Island handling on iOS |
 | Build/Deploy | **EAS Build + TestFlight** | Cloud iOS builds without a Mac CI server |
 
-### File structure
+### Back-end
+
+| Layer | Choice | Why |
+|---|---|---|
+| Framework | **Phoenix 1.8** | Fast, reliable Elixir web framework with built-in JSON support |
+| Language | **Elixir 1.19** | Fault-tolerant, great for concurrent API workloads |
+| Database | **SQLite via ecto_sqlite3** | Zero-config, file-based, easy to back up; upgrade to Postgres when needed |
+| Auth | **Bearer tokens** (bcrypt + random token in DB) | Simple, stateless, works well for mobile clients |
+| CORS | **cors_plug** | Allows the RN app (and local dev) to call the API |
+
+### Front-end file structure
 
 ```
-App.js          ← state machine + AsyncStorage (players, settings, completedDrills)
-cards.js        ← MOVE_CARDS + CASE_CARDS + HAZARD_CARDS + COUNTER_CARDS
-data.js         ← constants, utilities, getDailyDraw(), dealCards(), drawOneCard(); re-exports cards
-drills.js       ← DRILLS (5-step Bronze) + DRILLS_LEGACY (2-step Silver/Gold) for Solo Dojo
-styles.js       ← design tokens (C) + StyleSheet (S) — Ink & Spark palette
-components.js   ← Btn, CardBrowser, MovePickRow, BottomNav, card views (MoveCardView handles all cardTypes)
-screens.js      ← all screens (Home, Help, Account, PlayerPick, CasePick, CornerTime,
-                   Debate, CounterWindow, Counter, PlayerWins, SoloDojo)
-app.json        ← Expo + EAS config; icon = argus_main_icon.png
-argus_main_icon.png   ← shield crest icon (app icon + dojo drill bubble)
-argus_confident.png   ← single confident fox (Solo Dojo header + Corner Time)
-argus_expressions.png ← 6-expression sprite (Confident/Suspicious/etc.)
+front-end/
+├── App.js          ← state machine + AsyncStorage
+├── cards.js        ← MOVE_CARDS + CASE_CARDS + HAZARD_CARDS + COUNTER_CARDS + ...
+├── data.js         ← constants, utilities, getDailyDraw(), dealCards(), fetchRemoteCards()
+├── drills.js       ← DRILLS (5-step Bronze) + DRILLS_LEGACY for Solo Dojo
+├── styles.js       ← design tokens (C) + StyleSheet (S) — Ink & Spark palette
+├── components.js   ← Btn, CardBrowser, BottomNav, card views
+├── screens.js      ← all screens
+├── content/        ← remote case cards (cards.json for CDN)
+└── app.json        ← Expo + EAS config
+```
+
+### Back-end file structure
+
+```
+back-end/
+├── lib/debater_gambit/
+│   ├── accounts/
+│   │   ├── accounts.ex      ← register_user, sign_in, sign_out, get_user_by_token
+│   │   ├── user.ex          ← User schema + registration changeset
+│   │   └── user_token.ex    ← UserToken schema (Bearer tokens)
+│   └── stats/
+│       ├── stats.ex         ← complete_drill, record_game, record_card_plays, get_card_stats
+│       ├── card_stat.ex     ← CardStat schema (play_count, success_count, fail_count)
+│       ├── drill_completion.ex
+│       └── game_record.ex
+├── lib/debater_gambit_web/
+│   ├── controllers/api/
+│   │   ├── user_controller.ex    ← register, sign_in, sign_out, me
+│   │   ├── drill_controller.ex   ← complete, index
+│   │   ├── game_controller.ex    ← create, index
+│   │   └── stats_controller.ex   ← record (batch upsert), index
+│   ├── plugs/auth.ex             ← Bearer token auth plug
+│   └── router.ex
+└── priv/repo/migrations/         ← 5 migrations (users → user_tokens → drills → games → card_stats)
 ```
 
 **To add a move card:** append to `MOVE_CARDS` in `cards.js` + add a matching entry to `drills.js`. Always **append** — inserting changes index positions and breaks the daily seed for that date.
@@ -287,7 +329,11 @@ Change this value if the JSON moves to a different host.
 
 ## Running locally
 
+### Front-end (React Native / Expo)
+
 ```bash
+cd front-end
+
 # Requires Node 20+ (use nvm)
 nvm use 20
 npm install --legacy-peer-deps
@@ -296,9 +342,48 @@ npm install --legacy-peer-deps
 npx expo start
 ```
 
+### Back-end (Phoenix API)
+
+```bash
+cd back-end
+
+# First-time setup
+mix deps.get
+mix ecto.setup       # creates DB + runs all migrations
+
+# Start the server (runs on http://localhost:4000)
+mix phx.server
+```
+
+The API base URL is configured in `front-end/.env`:
+```
+EXPO_PUBLIC_API_URL=http://localhost:4000
+```
+Change to your deployed URL when shipping to production.
+
+## API reference
+
+All protected routes require `Authorization: Bearer <token>` header.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/users/register` | — | Create account `{ email, name, password }` |
+| POST | `/api/users/sign_in` | — | Sign in `{ email, password }` → `{ token, user }` |
+| DELETE | `/api/users/sign_out` | ✓ | Revoke current token |
+| GET | `/api/users/me` | ✓ | Current user info |
+| POST | `/api/drills/:id/complete` | ✓ | Mark a dojo drill complete |
+| GET | `/api/drills` | ✓ | List completed drill IDs |
+| POST | `/api/games` | ✓ | Record a game `{ game_type, winner_name, case_title, round_count }` |
+| GET | `/api/games` | ✓ | Last 20 games |
+| POST | `/api/card_stats/record` | ✓ | Batch-record card plays `{ plays: [{ card_id, card_type, success }] }` |
+| GET | `/api/card_stats` | ✓ | Stats per card (play_count, success_count, fail_count, success_rate) |
+
+Stats are tracked for **hazard** and **move** cards only. Joker, filibuster, and delegate cards are intentionally excluded.
+
 ## Building for TestFlight
 
 ```bash
+cd front-end
 npm install -g eas-cli
 eas login
 eas build --platform ios --profile production
