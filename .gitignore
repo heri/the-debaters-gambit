@@ -1,2 +1,41 @@
+# ── Front-end ─────────────────────────────────────────────────────────────────
+front-end/node_modules/
+front-end/.expo/
+front-end/dist/
+front-end/.env
+front-end/.env.local
+front-end/.env*.local
 
-node_modules/*
+# Expo / EAS build artefacts
+front-end/android/
+front-end/ios/
+front-end/*.jsbundle
+front-end/web-build/
+
+# ── Back-end ──────────────────────────────────────────────────────────────────
+back-end/_build/
+back-end/deps/
+back-end/cover/
+back-end/doc/
+back-end/tmp/
+back-end/.fetch
+back-end/erl_crash.dump
+back-end/*.ez
+back-end/debater_gambit-*.tar
+
+# SQLite databases (dev + test)
+back-end/*.db
+back-end/*.db-shm
+back-end/*.db-wal
+
+# Phoenix generated secrets (never commit these)
+back-end/config/prod.secret.exs
+back-end/config/releases.exs
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

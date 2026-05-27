@@ -448,7 +448,7 @@ export const S = StyleSheet.create({
   dailyPlayBtn: {
     backgroundColor: '#2ECFB0', borderRadius: 28,
     paddingHorizontal: 24, paddingVertical: 13,
-    alignItems: 'center',
+    alignItems: 'center', marginTop: 16,
   },
   dailyPlayBtnTxt: {
     color: '#E8DFC8', fontWeight: '800', fontSize: 14, letterSpacing: 1.5,

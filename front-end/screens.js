@@ -843,13 +843,13 @@ export const CornerTimeScreen = ({ player, cards = [], moves, activeHazard = nul
 // hand: Card[] — player's full hand; only move cards are shown/playable here
 // activeHazard: Card | null — hazard played by opponent before this turn
 // debateSecs: total seconds for this player's turn (configurable from Account)
-// onDone(moveCard, hazardFollowed) — move used + whether the active hazard was followed
+// onDone(moveCard, hazardCard, timedOut, jokerCard, filibusterCard, delegateCard, delegateMoveCard)
 
 export const DebateScreen = ({
   caseCard, player, nextPlayerName,
   hand = [], activeHazard = null,
   debateSecs = DEFAULT_DEBATE_SECS,
-  onDone,
+  onDone, onConcede,
 }) => {
   // Honour "30 SECONDS" hazard by capping the clock
   const effectiveSecs = activeHazard?.restrictDebateSecs
@@ -869,7 +869,8 @@ export const DebateScreen = ({
   const [selectedFilibuster,   setSelectedFilibuster]   = useState(null);
   const [selectedDelegate,     setSelectedDelegate]     = useState(null);
   const [selectedDelegateMove, setSelectedDelegateMove] = useState(null);
-  const [hazardFollowed, setHazardFollowed] = useState(false);
+  const [concedeMode, setConcedeMode] = useState(false);
+  const [concedeCard, setConcedeCard]  = useState(null);
   const intervalRef = useRef(null);
   const calledRef   = useRef(false);
 
@@ -886,11 +887,18 @@ export const DebateScreen = ({
     setSelectedDelegateMove(null);
   };
 
-  const finish = (move, followed, timedOut = false) => {
+  const finish = (move, timedOut = false) => {
     if (calledRef.current) return;
     calledRef.current = true;
     clearInterval(intervalRef.current);
-    onDone(move, followed, selectedHazard, timedOut, selectedJoker, selectedFilibuster, selectedDelegate, selectedDelegateMove);
+    onDone(move, selectedHazard, timedOut, selectedJoker, selectedFilibuster, selectedDelegate, selectedDelegateMove);
+  };
+
+  const concede = (card) => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    clearInterval(intervalRef.current);
+    onConcede(card);
   };
 
   useEffect(() => {
@@ -905,7 +913,7 @@ export const DebateScreen = ({
 
   // Auto-submit when the clock hits zero; timedOut=true triggers a penalty card in App.js
   useEffect(() => {
-    if (secondsLeft === 0) finish(selectedMove, hazardFollowed, true);
+    if (secondsLeft === 0) finish(selectedMove, true);
   }, [secondsLeft]);
 
   const tColor = timerColor(secondsLeft);
@@ -965,30 +973,13 @@ export const DebateScreen = ({
               </>
             ) : null}
 
-            {/* Hazard compliance toggle — hidden when joker is active */}
-            {!selectedJoker ? (
-              <TouchableOpacity
-                onPress={() => setHazardFollowed(prev => !prev)}
-                activeOpacity={0.8}
-                style={{
-                  borderRadius: 12, borderWidth: 2,
-                  borderColor: hazardFollowed ? '#4ADE80' : '#6B7280',
-                  backgroundColor: hazardFollowed ? '#071A07' : C.surface,
-                  padding: 12, marginBottom: 14,
-                  flexDirection: 'row', alignItems: 'center', gap: 8,
-                }}
-              >
-                <Text style={{ fontSize: 16 }}>{hazardFollowed ? '✅' : '☐'}</Text>
-                <Text style={{ color: hazardFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
-                  {hazardFollowed ? 'HAZARD FOLLOWED' : 'TAP TO CONFIRM: I FOLLOWED THE HAZARD'}
-                </Text>
-              </TouchableOpacity>
-            ) : (
+            {/* Joker-active banner */}
+            {selectedJoker ? (
               <View style={{ borderRadius: 12, borderWidth: 2, borderColor: '#FFD700', backgroundColor: '#1A1200', padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={{ fontSize: 16 }}>🃏</Text>
                 <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>JOKER ACTIVE — HAZARD CANCELLED</Text>
               </View>
-            )}
+            ) : null}
           </>
         ) : null}
 
@@ -1120,13 +1111,6 @@ export const DebateScreen = ({
           </>
         ) : null}
 
-        {activeHazard && !selectedJoker && !selectedDelegate && !hazardFollowed ? (
-          <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
-            <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
-              ⚠️ Confirm the hazard above — or play a joker to cancel it, or delegate your turn. Otherwise you'll receive a penalty card.
-            </Text>
-          </View>
-        ) : null}
         <Btn
           label={
             selectedFilibuster ? `⏭️  SKIP TURN${nextPlayerName ? ` — PASS TO ${nextPlayerName.toUpperCase()}` : ''}`
@@ -1134,10 +1118,156 @@ export const DebateScreen = ({
             : nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}`
             : '✓  DONE'
           }
-          onPress={() => finish(selectedDelegate ? null : selectedMove, hazardFollowed)}
+          onPress={() => finish(selectedDelegate ? null : selectedMove)}
           style={{ marginTop: 12 }}
         />
+
+        {/* ── Gambit Concession ──────────────────────────────────────────── */}
+        {!concedeMode ? (
+          <TouchableOpacity
+            onPress={() => setConcedeMode(true)}
+            activeOpacity={0.7}
+            style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }}
+          >
+            <Text style={{ color: C.muted, fontSize: 13, fontWeight: '600', letterSpacing: 0.5 }}>
+              🤚  Concede the Point
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 16 }}>
+            <Text style={{ color: '#FCA5A5', fontWeight: '900', fontSize: 12, letterSpacing: 2, marginBottom: 4 }}>
+              GAMBIT CONCESSION
+            </Text>
+            <Text style={{ color: C.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 }}>
+              Your turn ends now. Pick one card to discard — you'll draw a fresh one to replace it.
+            </Text>
+
+            {hand.map(card => {
+              const sel = concedeCard?.id === card.id;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  onPress={() => setConcedeCard(prev => prev?.id === card.id ? null : card)}
+                  activeOpacity={0.8}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 10,
+                    borderRadius: 10, borderWidth: 1.5,
+                    borderColor: sel ? '#EF4444' : C.border,
+                    backgroundColor: sel ? '#1A0000' : C.surface,
+                    padding: 10, marginBottom: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 26 }}>{card.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: sel ? '#FCA5A5' : '#E8DFC8', fontWeight: '800', fontSize: 13 }}>
+                      {card.name}
+                    </Text>
+                    <Text style={{ color: C.muted, fontSize: 11, lineHeight: 15 }} numberOfLines={1}>
+                      {card.what}
+                    </Text>
+                  </View>
+                  {sel ? <Text style={{ color: '#EF4444', fontWeight: '900', fontSize: 16 }}>✕</Text> : null}
+                </TouchableOpacity>
+              );
+            })}
+
+            <Btn
+              label="✕  CONCEDE — DISCARD & DRAW"
+              variant="secondary"
+              onPress={() => concede(concedeCard)}
+              disabled={!concedeCard}
+              style={{ marginTop: 8, borderColor: '#EF4444' }}
+            />
+            <TouchableOpacity
+              onPress={() => { setConcedeMode(false); setConcedeCard(null); }}
+              activeOpacity={0.7}
+              style={{ alignItems: 'center', paddingVertical: 12 }}
+            >
+              <Text style={{ color: C.muted, fontSize: 12 }}>Cancel — keep arguing</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Compliance Check: opponent judges whether the player followed a hazard/counter ──
+// judge: the player doing the judging
+// subject: the player being judged (who must comply or receive a penalty)
+// type: 'hazard' | 'counter'
+// card: the hazard or counter card in question
+// onYes(): subject complied — no penalty
+// onNo(): subject did not comply — App.js deals them a penalty card
+
+export const ComplianceCheckScreen = ({ judge, subject, type, card, onYes, onNo }) => {
+  const [showVoiceOut, setShowVoiceOut] = useState(false);
+  const isHazard = type === 'hazard';
+
+  const question = isHazard
+    ? `Did ${subject.name} follow the hazard?`
+    : `Did ${subject.name} effectively counter your argument?`;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <View style={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface }}>
+        <View style={[S.playerChip, { backgroundColor: '#6B7280' }]}>
+          <Text style={[S.playerChipTxt, { color: '#E8DFC8' }]}>{judge.name.toUpperCase()}  ·  JUDGE</Text>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={[S.scrollContent, { paddingTop: 32, paddingBottom: 48 }]}>
+        <Text style={{ fontSize: 22, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 30, marginBottom: 20 }}>
+          {question}
+        </Text>
+
+        {card ? (
+          <View style={{ backgroundColor: isHazard ? '#2A1000' : '#0D0029', borderRadius: 14, borderWidth: 1.5, borderColor: card.accent, padding: 14, marginBottom: 20 }}>
+            <Text style={{ color: card.accent, fontWeight: '900', fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>
+              {isHazard ? '⚡ HAZARD' : '🗡 COUNTER'}  ·  {card.name}
+            </Text>
+            <Text style={{ color: '#E8DFC8', fontSize: 13, lineHeight: 20 }}>{card.what || card.hint}</Text>
+          </View>
+        ) : null}
+
+        {!showVoiceOut ? (
+          <>
+            <Btn
+              label={`✓  YES — ${subject.name.toUpperCase()} COMPLIED`}
+              onPress={onYes}
+              style={{ marginTop: 8 }}
+            />
+            <Btn
+              label="✗  NO — THEY DID NOT"
+              variant="secondary"
+              onPress={() => setShowVoiceOut(true)}
+              style={{ marginTop: 8, borderColor: '#EF4444' }}
+            />
+          </>
+        ) : (
+          <View style={{ marginTop: 8 }}>
+            <View style={{ backgroundColor: '#1A0000', borderRadius: 12, borderWidth: 1, borderColor: '#EF4444', padding: 14, marginBottom: 16 }}>
+              <Text style={{ color: '#FCA5A5', fontWeight: '900', fontSize: 11, letterSpacing: 1.5, marginBottom: 6 }}>SAY OUT LOUD WHY</Text>
+              <Text style={{ color: C.muted, fontSize: 13, lineHeight: 20 }}>
+                Explain to {subject.name} what they failed to do. Be specific — this is how they improve.
+              </Text>
+            </View>
+            <Btn
+              label={`CONFIRM — ${subject.name.toUpperCase()} GETS A PENALTY CARD`}
+              variant="secondary"
+              onPress={onNo}
+              style={{ borderColor: '#EF4444', backgroundColor: '#1A0000' }}
+            />
+            <TouchableOpacity
+              onPress={() => setShowVoiceOut(false)}
+              activeOpacity={0.7}
+              style={{ alignItems: 'center', paddingVertical: 12 }}
+            >
+              <Text style={{ color: C.muted, fontSize: 12 }}>Actually, they did comply</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -1449,15 +1579,14 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
   const hazardCards = hand.filter(c => c.cardType === 'hazard');
   const [secsLeft, setSecsLeft] = useState(30);
   const [selectedHazard, setSelectedHazard] = useState(null);
-  const [counterFollowed, setCounterFollowed] = useState(false);
   const intervalRef = useRef(null);
   const calledRef = useRef(false);
 
-  const finish = (followed, hazard) => {
+  const finish = (hazard) => {
     if (calledRef.current) return;
     calledRef.current = true;
     clearInterval(intervalRef.current);
-    onDone(followed, hazard);
+    onDone(hazard);
   };
 
   useEffect(() => {
@@ -1471,7 +1600,7 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
   }, []);
 
   useEffect(() => {
-    if (secsLeft === 0) finish(counterFollowed, selectedHazard);
+    if (secsLeft === 0) finish(selectedHazard);
   }, [secsLeft]);
 
   const tColor = timerColor(secsLeft);
@@ -1497,23 +1626,6 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
             <Text style={{ color: '#E8DFC8', fontSize: 14, fontWeight: '600', lineHeight: 22 }}>{counterCard.hint}</Text>
           </View>
         ) : null}
-
-        <TouchableOpacity
-          onPress={() => setCounterFollowed(prev => !prev)}
-          activeOpacity={0.8}
-          style={{
-            borderRadius: 12, borderWidth: 2,
-            borderColor: counterFollowed ? '#4ADE80' : '#6B7280',
-            backgroundColor: counterFollowed ? '#071A07' : C.surface,
-            padding: 12, marginBottom: 14,
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-          }}
-        >
-          <Text style={{ fontSize: 16 }}>{counterFollowed ? '✅' : '☐'}</Text>
-          <Text style={{ color: counterFollowed ? '#4ADE80' : C.muted, fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>
-            {counterFollowed ? 'COUNTER DELIVERED' : 'TAP TO CONFIRM: I DID THE COUNTER'}
-          </Text>
-        </TouchableOpacity>
 
         {hazardCards.length > 0 && nextPlayerName ? (
           <>
@@ -1543,16 +1655,9 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
           </>
         ) : null}
 
-        {!counterFollowed ? (
-          <View style={{ marginTop: 12, backgroundColor: '#2A0A00', borderRadius: 10, borderWidth: 1, borderColor: '#FB923C', padding: 10 }}>
-            <Text style={{ color: '#FB923C', fontWeight: '700', fontSize: 12, textAlign: 'center', lineHeight: 18 }}>
-              ⚠️ Confirm your counter above — otherwise you'll receive a penalty card.
-            </Text>
-          </View>
-        ) : null}
         <Btn
           label={nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}` : '✓  DONE'}
-          onPress={() => finish(counterFollowed, selectedHazard)}
+          onPress={() => finish(selectedHazard)}
           style={{ marginTop: 12 }}
         />
         <View style={{ height: 40 }} />
