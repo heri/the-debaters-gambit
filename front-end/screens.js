@@ -45,6 +45,269 @@ const HistoryEntry = ({ item, myName }) => {
   );
 };
 
+// ── Onboarding: 3-page intro carousel shown on first launch ───────────────
+// onDone(): called when the user taps through all 3 pages
+
+const ONBOARDING_PAGES = [
+  {
+    eyebrow: 'WELCOME TO',
+    title: 'THE DEBATER\'S\nGAMBIT',
+    body: 'A card game that teaches you to speak up, argue well, and win people over. Used by kids, families, and anyone who wants to get better at thinking on their feet.',
+    sub: 'Play alone or with friends. No experience needed.',
+    cta: 'NEXT  →',
+    accent: '#F5C842',
+    skills: null,
+  },
+  {
+    eyebrow: 'WHAT YOU\'LL LEARN',
+    title: 'REAL SKILLS,\nREAL FAST',
+    body: null,
+    sub: 'Train solo with Quick Draw and the Dojo. Or face a real opponent in VS mode.',
+    cta: 'NEXT  →',
+    accent: '#2ECFB0',
+    skills: [
+      { icon: '🎙️', label: 'Speak clearly when it matters' },
+      { icon: '⚔️', label: 'Build arguments that actually hold up' },
+      { icon: '🛡️', label: 'Push back without falling apart' },
+      { icon: '🎭', label: 'Story, logic, or charm. Pick your weapon.' },
+    ],
+  },
+  {
+    eyebrow: 'HOW IT WORKS',
+    title: 'THREE STEPS,\nTHAT\'S IT',
+    body: null,
+    sub: 'Add your name first so the game knows who\'s playing.',
+    cta: 'LET\'S BEGIN  →',
+    accent: '#A78BFA',
+    skills: [
+      { icon: '🎴', label: 'Pick a Case. That\'s your debate topic.' },
+      { icon: '🃏', label: 'Play your cards: moves, hazards, counters' },
+      { icon: '🏆', label: 'Win by playing every card in your hand' },
+    ],
+  },
+];
+
+export const OnboardingScreen = ({ onDone }) => {
+  const [step, setStep] = useState(0);
+  const page = ONBOARDING_PAGES[step];
+  const isLast = step === ONBOARDING_PAGES.length - 1;
+
+  const advance = () => {
+    if (isLast) { onDone(); } else { setStep(s => s + 1); }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 28, paddingTop: 80, paddingBottom: 48, alignItems: 'center', justifyContent: 'center' }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Eyebrow */}
+        <Text style={{ fontSize: 11, fontWeight: '700', color: page.accent, letterSpacing: 3, marginBottom: 12, textAlign: 'center' }}>
+          {page.eyebrow}
+        </Text>
+
+        {/* Title */}
+        <Text style={{ fontSize: 38, fontWeight: '900', color: page.accent, textAlign: 'center', letterSpacing: 2, lineHeight: 46, marginBottom: 24 }}>
+          {page.title}
+        </Text>
+
+        {/* Body prose */}
+        {page.body ? (
+          <Text style={{ fontSize: 16, color: '#E8DFC8', textAlign: 'center', lineHeight: 26, marginBottom: 24 }}>
+            {page.body}
+          </Text>
+        ) : null}
+
+        {/* Skill / step list */}
+        {page.skills ? (
+          <View style={{ width: '100%', gap: 12, marginBottom: 24 }}>
+            {page.skills.map((s, i) => (
+              <View
+                key={i}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 14,
+                  backgroundColor: C.surface, borderRadius: 14, borderWidth: 1,
+                  borderColor: C.border, paddingHorizontal: 16, paddingVertical: 14 }}
+              >
+                <Text style={{ fontSize: 28 }}>{s.icon}</Text>
+                <Text style={{ flex: 1, color: '#E8DFC8', fontWeight: '700', fontSize: 14, lineHeight: 20 }}>
+                  {s.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Sub-text */}
+        <Text style={{ fontSize: 13, color: C.muted, textAlign: 'center', fontStyle: 'italic', lineHeight: 20, marginBottom: 36 }}>
+          {page.sub}
+        </Text>
+
+        {/* CTA */}
+        <Btn label={page.cta} onPress={advance} style={{ width: '100%' }} />
+
+        {/* Dot indicators */}
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 24, alignItems: 'center', justifyContent: 'center' }}>
+          {ONBOARDING_PAGES.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                { height: 6, borderRadius: 3, backgroundColor: C.border },
+                i === step
+                  ? { width: 20, backgroundColor: page.accent }
+                  : { width: 6 },
+              ]}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
+// ── Auth: register or sign in after onboarding ────────────────────────────
+// onSuccess(user, token) — called on successful register or sign in
+// onSkip()               — called when user taps "play as guest"
+
+export const AuthScreen = ({ onSuccess, onSkip }) => {
+  const [mode, setMode] = useState('register'); // 'register' | 'signin'
+  const [name, setName]         = useState('');
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+
+  // Lazy-import so api.js is not bundled until AuthScreen mounts
+  const doSubmit = async () => {
+    setError(null);
+    const e = email.trim().toLowerCase();
+    const p = password.trim();
+    const n = name.trim();
+
+    if (mode === 'register' && !n) { setError('Please enter your name.'); return; }
+    if (!e) { setError('Please enter your email.'); return; }
+    if (!p || p.length < 6) { setError('Password must be at least 6 characters.'); return; }
+
+    setLoading(true);
+    try {
+      const { apiRegister, apiSignIn } = require('./api');
+      const data = mode === 'register'
+        ? await apiRegister(n, e, p)
+        : await apiSignIn(e, p);
+      onSuccess(data.user, data.token);
+    } catch (err) {
+      const msgs = err?.body?.errors;
+      if (msgs) {
+        // Flatten Ecto changeset errors: { email: ["has already been taken"] }
+        const lines = Object.entries(msgs).map(([field, errs]) =>
+          `${field.charAt(0).toUpperCase() + field.slice(1)}: ${errs.join(', ')}`
+        );
+        setError(lines.join('\n'));
+      } else {
+        setError(err?.message || 'Something went wrong. Try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isRegister = mode === 'register';
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 28, paddingTop: 70, paddingBottom: 48 }}
+        style={{ backgroundColor: C.bg }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={{ fontSize: 11, fontWeight: '700', color: C.teal, letterSpacing: 3, textAlign: 'center', marginBottom: 8 }}>
+          JOIN THE PARLOUR
+        </Text>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: C.gold, textAlign: 'center', letterSpacing: 1, lineHeight: 36, marginBottom: 6 }}>
+          {isRegister ? 'Create your\naccount' : 'Welcome\nback'}
+        </Text>
+        <Text style={{ fontSize: 13, color: C.muted, textAlign: 'center', fontStyle: 'italic', lineHeight: 20, marginBottom: 28 }}>
+          {isRegister
+            ? 'Your wins, drills and history will follow you wherever you play.'
+            : 'Sign in and pick up right where you left off.'}
+        </Text>
+
+        {/* Mode toggle */}
+        <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 4, marginBottom: 24 }}>
+          {['register', 'signin'].map(m => (
+            <TouchableOpacity
+              key={m}
+              onPress={() => { setMode(m); setError(null); }}
+              style={{
+                flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center',
+                backgroundColor: mode === m ? C.teal : 'transparent',
+              }}
+            >
+              <Text style={{ fontWeight: '800', fontSize: 12, letterSpacing: 1.5, color: mode === m ? '#0D0F1C' : C.muted }}>
+                {m === 'register' ? 'CREATE ACCOUNT' : 'SIGN IN'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Fields */}
+        {isRegister ? (
+          <TextInput
+            style={S.playerInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Your name"
+            placeholderTextColor={C.muted}
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+        ) : null}
+        <TextInput
+          style={[S.playerInput, { marginTop: 10 }]}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="Email"
+          placeholderTextColor={C.muted}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="next"
+        />
+        <TextInput
+          style={[S.playerInput, { marginTop: 10 }]}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password (6+ characters)"
+          placeholderTextColor={C.muted}
+          secureTextEntry
+          returnKeyType="done"
+          onSubmitEditing={doSubmit}
+        />
+
+        {error ? (
+          <View style={{ backgroundColor: '#1A0000', borderRadius: 10, borderWidth: 1, borderColor: '#EF4444', padding: 12, marginTop: 12 }}>
+            <Text style={{ color: '#FCA5A5', fontSize: 13, lineHeight: 20 }}>{error}</Text>
+          </View>
+        ) : null}
+
+        <Btn
+          label={loading ? '...' : isRegister ? 'CREATE ACCOUNT  →' : 'SIGN IN  →'}
+          onPress={doSubmit}
+          style={{ marginTop: 20 }}
+          disabled={loading}
+        />
+
+        <TouchableOpacity onPress={onSkip} activeOpacity={0.7} style={{ alignItems: 'center', paddingVertical: 20 }}>
+          <Text style={{ color: C.muted, fontSize: 13 }}>
+            Not now. Play as a guest.
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
+
 // ── Home ───────────────────────────────────────────────────────────────────
 // dailyDraw: { caseCard, cards: Card[] } — pre-seeded by today's date
 
@@ -90,7 +353,7 @@ export const HomeScreen = ({ dailyDraw, onPlayDaily, history = [], myName }) => 
       </View>
     </TouchableOpacity>
 
-    <Text style={[S.hint, { marginTop: 20 }]}>Step into the Parlour — tap ⚔️ VS to pick your case</Text>
+    <Text style={[S.hint, { marginTop: 20 }]}>Step into the Parlour. Tap ⚔️ VS to pick your case.</Text>
 
     {history.length > 0 ? (
       <>
@@ -191,7 +454,7 @@ export const QuickDrawScreen = ({ caseCard, cards, onDone }) => {
         ) : (
           <>
             <Btn
-              label={selectedId ? '✓  CONFIRM — I USED THIS CARD' : 'Tap a card to use it'}
+              label={selectedId ? '✓  CONFIRM: I USED THIS CARD' : 'Tap a card to use it'}
               onPress={handleConfirm}
               disabled={!selectedId}
               style={{ marginTop: 24, opacity: selectedId ? 1 : 0.5 }}
@@ -220,7 +483,7 @@ export const HelpScreen = () => (
       small village at the edge of the known world.
     </Text>
     <Text style={S.helpBody}>
-      Ander and Sol were clever enough — but when arguments came, their words came
+      Ander and Sol were clever enough, but when arguments came, their words came
       out tangled. In debates they stumbled, and when they needed to persuade, they
       went red in the face and stomped their feet like children.
     </Text>
@@ -234,24 +497,24 @@ export const HelpScreen = () => (
       They played every night by firelight. Ander learned to tell stories that made
       hard truths sound like common wisdom. Sol learned to paint futures so bright
       that listeners forgot what they had been arguing about. They practiced the
-      moves of the greatest minds — the humble tale, the charming bluff, the bridge
+      moves of the greatest minds: the humble tale, the charming bluff, the bridge
       that turns enemies into allies.
     </Text>
     <Text style={S.helpBody}>
       Years passed. The brothers became the sharpest tongues in the land.
     </Text>
     <Text style={S.helpBody}>
-      When the old king died, it was Ander — calm, precise, unshakeable — who rose
+      When the old king died, it was Ander, calm, precise, unshakeable, who rose
       to the throne. Not by sword, but by word.
     </Text>
     <Text style={S.helpBody}>
       And Sol? Sol packed a small bag, took his sharpest moves, and disappeared
-      over the horizon — returning with stories so extraordinary that the whole
+      over the horizon, returning with stories so extraordinary that the whole
       kingdom went quiet to hear them. A life of adventure written entirely in
       arguments won.
     </Text>
     <Text style={S.helpBody}>
-      The game treats you as a junior debater — not a student. A member of the{' '}
+      The game treats you as a junior debater, not a student. A member of the{' '}
       <Text style={{ color: C.gold, fontStyle: 'italic' }}>Parlour of Minds</Text>.
       Not here to learn. Here to practise.
     </Text>
@@ -262,31 +525,31 @@ export const HelpScreen = () => (
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>1</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Choose a Case</Text> — pick the debate topic and select both players from the dropdowns. The first player listed argues first.
+        <Text style={{ color: C.gold }}>Choose a Case.</Text> Pick the debate topic and select both players from the dropdowns. The first player listed argues first.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Get your hand</Text> — each player is dealt cards from the full deck. There are six types:{'\n'}
-        {'  '}⚔️  <Text style={{ color: C.gold }}>Move cards</Text> — rhetorical techniques (Fair Play, Honest Tale…). Play one during your argument turn.{'\n'}
-        {'  '}⚡  <Text style={{ color: C.gold }}>Hazard cards</Text> — played against your opponent before their turn to restrict how they argue.{'\n'}
-        {'  '}🛡️  <Text style={{ color: C.gold }}>Counter cards</Text> — interrupt your opponent after they argue and deliver a rebuttal.{'\n'}
-        {'  '}🃏  <Text style={{ color: C.gold }}>Joker cards</Text> — cancel a hazard that was played against you, freeing you to argue without the restriction.{'\n'}
-        {'  '}⏭️  <Text style={{ color: C.gold }}>Filibuster cards</Text> — skip your turn entirely. Can only be played if your opponent did not play a hazard against you.{'\n'}
-        {'  '}📋  <Text style={{ color: C.gold }}>Delegate cards</Text> — your opponent must argue your side of the case for your turn. You can also hand them a move card they must follow. Works even if a hazard is active.
+        <Text style={{ color: C.gold }}>Get your hand.</Text> Each player is dealt cards from the full deck. Six types:{'\n'}
+        {'  '}⚔️  <Text style={{ color: C.gold }}>Move cards</Text>: rhetorical techniques (Fair Play, Honest Tale…). Play one on your turn.{'\n'}
+        {'  '}⚡  <Text style={{ color: C.gold }}>Hazard cards</Text>: played against your opponent before their turn, restricting how they can argue.{'\n'}
+        {'  '}🛡️  <Text style={{ color: C.gold }}>Counter cards</Text>: interrupt after your opponent argues and hit back with a rebuttal.{'\n'}
+        {'  '}🃏  <Text style={{ color: C.gold }}>Joker cards</Text>: cancel a hazard played against you so you can argue freely.{'\n'}
+        {'  '}⏭️  <Text style={{ color: C.gold }}>Filibuster cards</Text>: skip your turn entirely. Can't be played if you have an active hazard.{'\n'}
+        {'  '}📋  <Text style={{ color: C.gold }}>Delegate cards</Text>: your opponent argues your side of the case. You can hand them a move card they must follow. Works even under a hazard.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Each turn has three phases</Text> — (1) <Text style={{ color: C.gold }}>Hazard Window</Text>: opponent may play a hazard card against you. (2) <Text style={{ color: C.gold }}>Argument</Text>: you debate and choose how to play — a move card, a joker to cancel the hazard, a filibuster to skip your turn, or a delegate card to pass your turn to your opponent. (3) <Text style={{ color: C.gold }}>Counter Window</Text>: opponent has 15 seconds to play a counter card for a rebuttal — then you get a 30-second comeback. At end of turn you may exchange one card.
+        <Text style={{ color: C.gold }}>Each turn has three phases.</Text> (1) <Text style={{ color: C.gold }}>Hazard Window</Text>: your opponent may play a hazard against you. (2) <Text style={{ color: C.gold }}>Argument</Text>: you debate and pick how to play. A move card, a joker to cancel the hazard, a filibuster to skip, or a delegate card to pass your turn. (3) <Text style={{ color: C.gold }}>Counter Window</Text>: your opponent has 15 seconds to play a counter card. If they do, you get a 30-second comeback. At the end of your turn you may swap one card.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>4</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Win</Text> — be the first to have zero cards at the start of your turn. Use every card in your hand to win. No scoring — just outwit your opponent.
+        <Text style={{ color: C.gold }}>Win.</Text> Be the first player with zero cards at the start of your turn. Use every card in your hand. No scoring. Just outwit each other.
       </Text>
     </View>
 
@@ -294,74 +557,72 @@ export const HelpScreen = () => (
     <Text style={[S.screenTitle, { marginTop: 8 }]}>SOLO DOJO</Text>
     <Text style={S.helpBody}>
       The Solo Dojo is where you train alone with{' '}
-      <Text style={{ color: C.gold, fontStyle: 'italic' }}>Argus</Text>{' '}
-      — the fox barrister. Pick any unlocked move card from the list, and Argus walks you through it in five steps.
+      <Text style={{ color: C.gold, fontStyle: 'italic' }}>Argus</Text>
+      , the fox barrister. Pick any unlocked move card and Argus walks you through it in five steps.
     </Text>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>1</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Understand</Text> — Argus explains the move and why it works, with examples drawn from history's sharpest minds.
+        <Text style={{ color: C.gold }}>Understand.</Text> Argus explains the move and why it works, with real examples.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Feel it</Text> — You explore the emotion behind the move: why it matters, what it does to the person hearing it.
+        <Text style={{ color: C.gold }}>Feel it.</Text> You explore the emotion behind the move: why it matters and what it does to the person hearing it.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>See it</Text> — Argus shows the move in a real argument. You identify what makes it work.
+        <Text style={{ color: C.gold }}>See it.</Text> Argus shows the move used in a real argument. You spot what makes it work.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>4</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Build it</Text> — You construct a full response using the move technique, step by step.
+        <Text style={{ color: C.gold }}>Build it.</Text> You put together a full response using the move, step by step.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>5</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Say it</Text> — A model response appears on screen. You have 15 seconds to say it out loud. Say it like you mean it.
+        <Text style={{ color: C.gold }}>Say it.</Text> A response appears on screen. You have 15 seconds to say it out loud. Say it like you mean it.
       </Text>
     </View>
     <Text style={S.helpBody}>
-      <Text style={{ color: C.teal }}>BRONZE</Text> cards are always available.{' '}
-      <Text style={{ color: '#C0C0C0' }}>SILVER</Text> unlocks when all 8 Bronze are mastered.{' '}
-      <Text style={{ color: '#ECC94B' }}>GOLD</Text> unlocks when both Silver are done. All drills can be replayed anytime.
+      <Text style={{ color: C.teal }}>BRONZE</Text> cards are always open.{' '}
+      <Text style={{ color: '#C0C0C0' }}>SILVER</Text> unlocks when all 8 Bronze are done.{' '}
+      <Text style={{ color: '#ECC94B' }}>GOLD</Text> unlocks when both Silver are done. Every drill can be replayed anytime.
     </Text>
 
     <View style={S.helpDivider} />
     <Text style={[S.screenTitle, { marginTop: 8 }]}>QUICK DRAW</Text>
     <Text style={S.helpBody}>
-      Every day the home screen deals a fresh challenge — one Case Card and three
-      play cards (move or hazard), seeded from the date. Everyone gets the same
-      draw on the same day.
+      Every day the home screen deals a fresh challenge: one Case Card and three
+      play cards, seeded from today's date. Everyone gets the same draw on the same day.
     </Text>
     <Text style={S.helpBody}>
       Tap <Text style={{ color: C.gold }}>▶ Start Quick Draw</Text> to begin.
-      No opponent, no timer — just you and your creativity. Argue the case using
-      the cards as your tools.
+      No opponent, no timer. Just you, your cards, and whatever argument you can build.
     </Text>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>1</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Read the case</Text> — it's your prompt. Argue for it, against it, or sideways. Creativity counts.
+        <Text style={{ color: C.gold }}>Read the case.</Text> That's your prompt. Argue for it, against it, or sideways. Creativity counts.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>2</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Tap a card to select it</Text> — it highlights to show you're using it.
+        <Text style={{ color: C.gold }}>Tap a card to select it.</Text> It highlights to show you're using it.
         Press <Text style={{ color: C.gold }}>Confirm</Text> to mark it as played.
       </Text>
     </View>
     <View style={S.helpRule}>
       <Text style={S.helpRuleNum}>3</Text>
       <Text style={S.helpRuleText}>
-        <Text style={{ color: C.gold }}>Use all three cards</Text> — when the last one is confirmed, the Quick Draw is complete. You can use them one by one or all at once.
+        <Text style={{ color: C.gold }}>Use all three cards.</Text> When the last one is confirmed, the Quick Draw is complete. Use them one by one or all at once.
       </Text>
     </View>
   </ScrollView>
@@ -369,7 +630,7 @@ export const HelpScreen = () => (
 
 // ── Account ────────────────────────────────────────────────────────────────
 
-export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSecsChange, cardsPerPlayer, onCardsPerPlayerChange, history, isOnboarding, myName }) => {
+export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSecsChange, cardsPerPlayer, onCardsPerPlayerChange, history, isOnboarding, myName, authUser, onSignOut, onSignIn }) => {
   const [name, setName] = useState('');
 
   const submit = () => {
@@ -387,6 +648,32 @@ export const AccountScreen = ({ players, onAdd, onRemove, debateSecs, onDebateSe
         style={{ backgroundColor: C.bg }}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Auth status banner ─────────────────────────────────────────── */}
+        {authUser ? (
+          <View style={{ backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.teal, padding: 16, marginBottom: 20 }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: C.teal, letterSpacing: 2, marginBottom: 4 }}>SIGNED IN</Text>
+            <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 16, marginBottom: 2 }}>{authUser.name}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 14 }}>{authUser.email}</Text>
+            <TouchableOpacity
+              onPress={onSignOut}
+              style={{ alignSelf: 'flex-start', borderRadius: 8, borderWidth: 1, borderColor: '#6B7280', paddingHorizontal: 14, paddingVertical: 7 }}
+            >
+              <Text style={{ color: C.muted, fontWeight: '700', fontSize: 12, letterSpacing: 1 }}>SIGN OUT</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={onSignIn}
+            style={{ backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <View>
+              <Text style={{ color: '#E8DFC8', fontWeight: '800', fontSize: 14, marginBottom: 2 }}>Playing as guest</Text>
+              <Text style={{ color: C.muted, fontSize: 12 }}>Sign in to sync progress across devices</Text>
+            </View>
+            <Text style={{ color: C.teal, fontWeight: '900', fontSize: 13 }}>→</Text>
+          </TouchableOpacity>
+        )}
+
         {isOnboarding ? (
           <View style={S.onboardingBanner}>
             <Text style={S.onboardingTitle}>👋 WELCOME!</Text>
@@ -756,7 +1043,7 @@ export const PassScreen = ({ name, onReady }) => (
   <View style={S.screen}>
     <Text style={S.coverEyebrow}>PASS THE PHONE TO</Text>
     <Text style={S.coverHeading}>{name}</Text>
-    <Text style={S.coverHint}>Cover the screen — don't peek 👀</Text>
+    <Text style={S.coverHint}>Cover the screen. Don't peek 👀</Text>
     <TouchableOpacity style={S.coverTap} onPress={onReady} activeOpacity={0.8}>
       <Text style={S.coverTapIcon}>🃏</Text>
       <Text style={S.coverTapLabel}>TAP WHEN READY</Text>
@@ -948,7 +1235,7 @@ export const DebateScreen = ({
             {jokerCards.length > 0 ? (
               <>
                 <Text style={[S.screenLabel, { marginBottom: 4 }]}>🃏 PLAY A JOKER TO CANCEL</Text>
-                <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to cancel this hazard — or ignore it and follow the hazard below.</Text>
+                <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to cancel this hazard. Or just follow it.</Text>
                 {jokerCards.map(card => {
                   const sel = selectedJoker?.id === card.id;
                   return (
@@ -977,7 +1264,7 @@ export const DebateScreen = ({
             {selectedJoker ? (
               <View style={{ borderRadius: 12, borderWidth: 2, borderColor: '#FFD700', backgroundColor: '#1A1200', padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={{ fontSize: 16 }}>🃏</Text>
-                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>JOKER ACTIVE — HAZARD CANCELLED</Text>
+                <Text style={{ color: '#FFD700', fontWeight: '900', fontSize: 11, letterSpacing: 1.5 }}>JOKER ACTIVE / HAZARD CANCELLED</Text>
               </View>
             ) : null}
           </>
@@ -989,7 +1276,7 @@ export const DebateScreen = ({
         {!selectedDelegate && filibusterCards.length > 0 && !activeHazard ? (
           <>
             <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 4 }]}>⏭️ OR PLAY A FILIBUSTER</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Skip your debate turn entirely — no argument needed.</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Skip your debate turn. No argument needed.</Text>
             {filibusterCards.map(card => {
               const sel = selectedFilibuster?.id === card.id;
               return (
@@ -1011,7 +1298,7 @@ export const DebateScreen = ({
         {/* Filibuster active banner */}
         {selectedFilibuster ? (
           <View style={{ borderRadius: 12, borderWidth: 2, borderColor: selectedFilibuster.accent, backgroundColor: '#0A0A12', padding: 14, marginTop: 8, marginBottom: 8 }}>
-            <Text style={{ color: selectedFilibuster.accent, fontWeight: '900', fontSize: 12, letterSpacing: 1.5, marginBottom: 4 }}>⏭️ FILIBUSTER ACTIVE — TURN SKIPPED</Text>
+            <Text style={{ color: selectedFilibuster.accent, fontWeight: '900', fontSize: 12, letterSpacing: 1.5, marginBottom: 4 }}>⏭️ FILIBUSTER ACTIVE / TURN SKIPPED</Text>
             <Text style={{ color: C.muted, fontSize: 12 }}>Your debate turn will be skipped. You may still place a hazard for {nextPlayerName || 'the next player'} below.</Text>
           </View>
         ) : null}
@@ -1050,7 +1337,7 @@ export const DebateScreen = ({
             </Text>
             {selectedDelegate ? (
               <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>
-                Pick one from your hand — {nextPlayerName || 'your opponent'} must argue using this technique. Or skip.
+                Pick one from your hand. {nextPlayerName || 'Your opponent'} must use it. Or skip.
               </Text>
             ) : null}
             {moveCards.map(card => {
@@ -1086,7 +1373,7 @@ export const DebateScreen = ({
         {hazardCards.length > 0 && nextPlayerName ? (
           <>
             <Text style={[S.screenLabel, { marginTop: 22, marginBottom: 4 }]}>⚡ HAZARD FOR {nextPlayerName.toUpperCase()}</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to restrict {nextPlayerName}'s argument — or skip.</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to restrict {nextPlayerName}'s argument. Or skip.</Text>
             {hazardCards.map(card => {
               const sel = selectedHazard?.id === card.id;
               return (
@@ -1113,7 +1400,7 @@ export const DebateScreen = ({
 
         <Btn
           label={
-            selectedFilibuster ? `⏭️  SKIP TURN${nextPlayerName ? ` — PASS TO ${nextPlayerName.toUpperCase()}` : ''}`
+            selectedFilibuster ? `⏭️  SKIP TURN${nextPlayerName ? ` / PASS TO ${nextPlayerName.toUpperCase()}` : ''}`
             : selectedDelegate ? `📋  DELEGATE TO ${(nextPlayerName || 'OPPONENT').toUpperCase()}`
             : nextPlayerName ? `→  PASS TO ${nextPlayerName.toUpperCase()}`
             : '✓  DONE'
@@ -1139,7 +1426,7 @@ export const DebateScreen = ({
               GAMBIT CONCESSION
             </Text>
             <Text style={{ color: C.muted, fontSize: 12, lineHeight: 18, marginBottom: 14 }}>
-              Your turn ends now. Pick one card to discard — you'll draw a fresh one to replace it.
+              Your turn ends now. Pick one card to discard. You'll get a fresh one in return.
             </Text>
 
             {hand.map(card => {
@@ -1172,7 +1459,7 @@ export const DebateScreen = ({
             })}
 
             <Btn
-              label="✕  CONCEDE — DISCARD & DRAW"
+              label="✕  CONCEDE: DISCARD & DRAW"
               variant="secondary"
               onPress={() => concede(concedeCard)}
               disabled={!concedeCard}
@@ -1183,7 +1470,7 @@ export const DebateScreen = ({
               activeOpacity={0.7}
               style={{ alignItems: 'center', paddingVertical: 12 }}
             >
-              <Text style={{ color: C.muted, fontSize: 12 }}>Cancel — keep arguing</Text>
+              <Text style={{ color: C.muted, fontSize: 12 }}>Never mind, I'll keep arguing</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1234,12 +1521,12 @@ export const ComplianceCheckScreen = ({ judge, subject, type, card, onYes, onNo 
         {!showVoiceOut ? (
           <>
             <Btn
-              label={`✓  YES — ${subject.name.toUpperCase()} COMPLIED`}
+              label={`✓  YES, ${subject.name.toUpperCase()} COMPLIED`}
               onPress={onYes}
               style={{ marginTop: 8 }}
             />
             <Btn
-              label="✗  NO — THEY DID NOT"
+              label="✗  NO, THEY DID NOT"
               variant="secondary"
               onPress={() => setShowVoiceOut(true)}
               style={{ marginTop: 8, borderColor: '#EF4444' }}
@@ -1250,11 +1537,11 @@ export const ComplianceCheckScreen = ({ judge, subject, type, card, onYes, onNo 
             <View style={{ backgroundColor: '#1A0000', borderRadius: 12, borderWidth: 1, borderColor: '#EF4444', padding: 14, marginBottom: 16 }}>
               <Text style={{ color: '#FCA5A5', fontWeight: '900', fontSize: 11, letterSpacing: 1.5, marginBottom: 6 }}>SAY OUT LOUD WHY</Text>
               <Text style={{ color: C.muted, fontSize: 13, lineHeight: 20 }}>
-                Explain to {subject.name} what they failed to do. Be specific — this is how they improve.
+                Tell {subject.name} exactly what they got wrong. Say it out loud.
               </Text>
             </View>
             <Btn
-              label={`CONFIRM — ${subject.name.toUpperCase()} GETS A PENALTY CARD`}
+              label={`CONFIRM: ${subject.name.toUpperCase()} GETS A PENALTY CARD`}
               variant="secondary"
               onPress={onNo}
               style={{ borderColor: '#EF4444', backgroundColor: '#1A0000' }}
@@ -1264,7 +1551,7 @@ export const ComplianceCheckScreen = ({ judge, subject, type, card, onYes, onNo 
               activeOpacity={0.7}
               style={{ alignItems: 'center', paddingVertical: 12 }}
             >
-              <Text style={{ color: C.muted, fontSize: 12 }}>Actually, they did comply</Text>
+              <Text style={{ color: C.muted, fontSize: 12 }}>Wait, actually they did</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1392,7 +1679,7 @@ export const CounterWindowScreen = ({ player, counterCards, onPlay, onSkip }) =>
           Heard something{'\n'}worth countering?
         </Text>
         <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', marginBottom: 28 }}>
-          {player.name} — choose a counter card to interrupt, or skip straight to your argument.
+          {player.name}, pick a counter card to interrupt. Or skip and make your own argument.
         </Text>
 
         {counterCards.map(card => (
@@ -1533,11 +1820,11 @@ export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], haz
           Pick a hazard{'\n'}for {arguer.name}
         </Text>
         <Text style={{ color: C.muted, fontSize: 14, textAlign: 'center', marginBottom: 20 }}>
-          {hazardPlayer.name} — play one hazard card to restrict {arguer.name}'s argument, or skip.
+          {hazardPlayer.name}, play a hazard to restrict {arguer.name}'s argument. Or skip.
         </Text>
 
         {hazardCards.length === 0 ? (
-          <Text style={[S.hint, { textAlign: 'center' }]}>No hazard cards in hand — skip to continue.</Text>
+          <Text style={[S.hint, { textAlign: 'center' }]}>No hazard cards in hand. Skip to continue.</Text>
         ) : hazardCards.map(card => (
           <TouchableOpacity
             key={card.id}
@@ -1630,7 +1917,7 @@ export const ComebackScreen = ({ player, counterCard, hand = [], nextPlayerName,
         {hazardCards.length > 0 && nextPlayerName ? (
           <>
             <Text style={[S.screenLabel, { marginTop: 8, marginBottom: 4 }]}>⚡ HAZARD FOR {nextPlayerName.toUpperCase()}</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to restrict {nextPlayerName}'s next argument — or skip.</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Play one to restrict {nextPlayerName}'s next argument. Or skip.</Text>
             {hazardCards.map(card => {
               const sel = selectedHazard?.id === card.id;
               return (
@@ -1686,7 +1973,7 @@ export const ExchangeScreen = ({ player, hand = [], onDone }) => {
       <Text style={[S.screenLabel, { marginBottom: 4 }]}>END OF TURN</Text>
       <Text style={[S.screenTitle, { marginBottom: 8 }]}>EXCHANGE{'\n'}A CARD?</Text>
       <Text style={S.hint}>
-        {player.name} — pick a card to swap for a new one, or skip.
+        {player.name}, pick a card to swap for a new one. Or skip.
       </Text>
 
       <Text style={[S.screenLabel, { marginTop: 20, marginBottom: 10 }]}>CHOOSE CARD TO SWAP</Text>

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 
 import { uid, DEFAULT_DEBATE_SECS, getDailyDraw, dealCards, drawOneCard, fetchRemoteCards, getMergedCases } from './data';
+import { apiGetMe, apiCompleteDrill, apiGetCompletedDrills, apiRecordGame, apiSignOut } from './api';
 import { S } from './styles';
 import { BottomNav } from './components';
 import {
@@ -17,6 +18,7 @@ import {
   DelegateDebateScreen, CounterWindowScreen,
   ComebackScreen, ExchangeScreen, PlayerWinsScreen,
   SoloDojoScreen, QuickDrawScreen, ComplianceCheckScreen,
+  OnboardingScreen, AuthScreen,
 } from './screens';
 import { HandPanel } from './components';
 
@@ -47,7 +49,13 @@ import { HandPanel } from './components';
 export default function App() {
   // Startup
   const [isReady, setIsReady] = useState(false);
+  // 'loading' | 'onboarding' | 'auth' | 'app'
+  const [startupPhase, setStartupPhase] = useState('loading');
   const [isOnboarding, setIsOnboarding] = useState(false);
+
+  // Authenticated user (null = guest)
+  const [authUser, setAuthUser]   = useState(null);
+  const [authToken, setAuthToken] = useState(null);
 
   // Navigation
   const [activeTab, setActiveTab] = useState('home');
@@ -103,11 +111,18 @@ export default function App() {
 
   // ── Load from AsyncStorage on mount ─────────────────────────────────────
   useEffect(() => {
-    AsyncStorage.multiGet(['players', 'settings', 'completedDrills']).then(results => {
+    AsyncStorage.multiGet([
+      'players', 'settings', 'completedDrills',
+      'onboarding_seen', 'auth_skipped', 'auth_token',
+    ]).then(async results => {
       const playersRaw         = results[0][1];
       const settingsRaw        = results[1][1];
       const completedDrillsRaw = results[2][1];
+      const onboardingSeen     = results[3][1];
+      const authSkipped        = results[4][1];
+      const savedToken         = results[5][1];
 
+      // ── Local state ──────────────────────────────────────────────────────
       if (playersRaw) {
         const saved = JSON.parse(playersRaw);
         setPlayers(saved);
@@ -116,18 +131,43 @@ export default function App() {
         setIsOnboarding(true);
         setActiveTab('account');
       }
-
       if (settingsRaw) {
         const s = JSON.parse(settingsRaw);
-        if (s.debateSecs)                    setDebateSecs(s.debateSecs);
-        if (s.cardsPerPlayer !== undefined)  setCardsPerPlayer(s.cardsPerPlayer);
+        if (s.debateSecs)                   setDebateSecs(s.debateSecs);
+        if (s.cardsPerPlayer !== undefined) setCardsPerPlayer(s.cardsPerPlayer);
       }
-
       if (completedDrillsRaw) setCompletedDrills(JSON.parse(completedDrillsRaw));
 
       setIsReady(true);
       fetchRemoteCards().then(remote => { if (remote) setRemoteCards(remote); }).catch(() => {});
-    }).catch(() => setIsReady(true));
+
+      // ── Auth check ───────────────────────────────────────────────────────
+      if (savedToken) {
+        const user = await apiGetMe(savedToken);
+        if (user) {
+          setAuthUser(user);
+          setAuthToken(savedToken);
+          // Merge server-side completed drills into local state
+          const serverDrills = await apiGetCompletedDrills(savedToken);
+          if (serverDrills.length > 0) {
+            setCompletedDrills(prev => [...new Set([...prev, ...serverDrills])]);
+          }
+          setStartupPhase('app');
+          return;
+        }
+        // Token expired / invalid — discard it
+        AsyncStorage.removeItem('auth_token').catch(() => {});
+      }
+
+      // ── No valid token: decide where to start ────────────────────────────
+      if (!onboardingSeen) {
+        setStartupPhase('onboarding');
+      } else if (!authSkipped) {
+        setStartupPhase('auth');
+      } else {
+        setStartupPhase('app');
+      }
+    }).catch(() => { setIsReady(true); setStartupPhase('app'); });
   }, []);
 
   // ── Persistence ──────────────────────────────────────────────────────────
@@ -158,10 +198,30 @@ export default function App() {
 
   const handleRemovePlayer = id => setPlayers(prev => prev.filter(p => p.id !== id));
 
+  const handleAuthSuccess = (user, token) => {
+    AsyncStorage.setItem('auth_token', token).catch(() => {});
+    setAuthUser(user);
+    setAuthToken(token);
+    setStartupPhase('app');
+    // Merge server-side drills
+    apiGetCompletedDrills(token).then(serverDrills => {
+      if (serverDrills.length > 0) setCompletedDrills(prev => [...new Set([...prev, ...serverDrills])]);
+    });
+  };
+
+  const handleSignOut = () => {
+    if (authToken) apiSignOut(authToken);
+    AsyncStorage.multiRemove(['auth_token', 'auth_skipped']).catch(() => {});
+    setAuthUser(null);
+    setAuthToken(null);
+    setStartupPhase('auth');
+  };
+
   // ── Solo Dojo ────────────────────────────────────────────────────────────
   const handleDrillComplete = cardId => {
     if (!completedDrills.includes(cardId)) {
       setCompletedDrills(prev => [...prev, cardId]);
+      if (authToken) apiCompleteDrill(authToken, cardId);
     }
   };
 
@@ -196,13 +256,22 @@ export default function App() {
   };
 
   const handleEndGame = () => {
-    setHistory(h => [{
+    const entry = {
       id: uid(),
       case: selectedCase.title,
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       winner: winningPlayer?.name ?? null,
       players: [player1.name, player2.name],
-    }, ...h]);
+    };
+    setHistory(h => [entry, ...h]);
+    if (authToken) {
+      apiRecordGame(authToken, {
+        game_type: 'vs',
+        winner_name: entry.winner,
+        case_title: entry.case,
+        round_count: currentRound,
+      });
+    }
     setActiveTab('home');
     resetGame('new_case');
   };
@@ -560,7 +629,7 @@ export default function App() {
   };
 
   // ── Splash while loading ─────────────────────────────────────────────────
-  if (!isReady) {
+  if (!isReady || startupPhase === 'loading') {
     return (
       <SafeAreaView style={S.safe}>
         <ExpoStatusBar style="light" />
@@ -595,6 +664,9 @@ export default function App() {
         history={history}
         isOnboarding={isOnboarding}
         myName={players[0]?.name}
+        authUser={authUser}
+        onSignOut={handleSignOut}
+        onSignIn={() => setStartupPhase('auth')}
       />
     );
 
@@ -832,6 +904,33 @@ export default function App() {
     if (['counter_window_p1'].includes(gamePhase)) return p1Hand;
     return null;
   })();
+
+  if (startupPhase === 'onboarding') {
+    return (
+      <SafeAreaView style={S.safe}>
+        <ExpoStatusBar style="light" />
+        <OnboardingScreen onDone={() => {
+          AsyncStorage.setItem('onboarding_seen', '1').catch(() => {});
+          setStartupPhase('auth');
+        }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (startupPhase === 'auth') {
+    return (
+      <SafeAreaView style={S.safe}>
+        <ExpoStatusBar style="light" />
+        <AuthScreen
+          onSuccess={handleAuthSuccess}
+          onSkip={() => {
+            AsyncStorage.setItem('auth_skipped', '1').catch(() => {});
+            setStartupPhase('app');
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={S.safe}>

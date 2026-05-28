@@ -6,7 +6,8 @@
       "Bash(npm install *)",
       "Bash(npx jest *)",
       "Bash(./node_modules/.bin/jest --watchAll=false)",
-      "Bash(node_modules/.bin/jest --watchAll=false)"
+      "Bash(node_modules/.bin/jest --watchAll=false)",
+      "Bash(node -e ' *)"
     ]
   }
 }
