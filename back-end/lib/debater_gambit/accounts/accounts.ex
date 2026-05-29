@@ -45,6 +45,8 @@ defmodule DebaterGambit.Accounts do
     Repo.one(query)
   end
 
+  def get_user(id), do: Repo.get(User, id)
+
   # ── Helpers ───────────────────────────────────────────────────────────────
 
   def generate_token(user) do

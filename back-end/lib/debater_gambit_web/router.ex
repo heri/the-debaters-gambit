@@ -10,14 +10,28 @@ defmodule DebaterGambitWeb.Router do
     plug DebaterGambitWeb.Plugs.Auth
   end
 
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_flash
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
+  pipeline :admin do
+    plug DebaterGambitWeb.Plugs.AdminAuth
+  end
+
+  # ── Public API ─────────────────────────────────────────────────────────────
+
   scope "/api", DebaterGambitWeb.API do
     pipe_through :api
 
-    # Public — no auth required
+    get "/cards", CardsController, :index
+
     post "/users/register", UserController, :register
     post "/users/sign_in", UserController, :sign_in
 
-    # Protected — require Bearer token
     pipe_through :authenticated
 
     delete "/users/sign_out", UserController, :sign_out
@@ -31,6 +45,23 @@ defmodule DebaterGambitWeb.Router do
 
     post "/card_stats/record", StatsController, :record
     get "/card_stats", StatsController, :index
+  end
+
+  # ── Admin ──────────────────────────────────────────────────────────────────
+
+  scope "/admin", DebaterGambitWeb.Admin do
+    pipe_through :browser
+
+    get "/login", SessionController, :new
+    post "/login", SessionController, :create
+    delete "/logout", SessionController, :delete
+
+    pipe_through :admin
+
+    get "/cards", CardsController, :index
+    get "/cards/new", CardsController, :new
+    post "/cards", CardsController, :create
+    post "/cards/:id/toggle", CardsController, :toggle
   end
 
   # Enable LiveDashboard in development

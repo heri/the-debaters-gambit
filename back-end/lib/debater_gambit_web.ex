@@ -47,6 +47,14 @@ defmodule DebaterGambitWeb do
     end
   end
 
+  def html do
+    quote do
+      use Phoenix.Component
+      use Gettext, backend: DebaterGambitWeb.Gettext
+      unquote(verified_routes())
+    end
+  end
+
   def verified_routes do
     quote do
       use Phoenix.VerifiedRoutes,

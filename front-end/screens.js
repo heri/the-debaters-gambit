@@ -254,7 +254,7 @@ export const AuthScreen = ({ onSuccess, onSkip }) => {
         {/* Fields */}
         {isRegister ? (
           <TextInput
-            style={S.playerInput}
+            style={[S.playerInput, { flex: undefined, height: 50, marginRight: 0 }]}
             value={name}
             onChangeText={setName}
             placeholder="Your name"
@@ -264,7 +264,7 @@ export const AuthScreen = ({ onSuccess, onSkip }) => {
           />
         ) : null}
         <TextInput
-          style={[S.playerInput, { marginTop: 10 }]}
+          style={[S.playerInput, { flex: undefined, height: 50, marginRight: 0, marginTop: 10 }]}
           value={email}
           onChangeText={setEmail}
           placeholder="Email"
@@ -275,7 +275,7 @@ export const AuthScreen = ({ onSuccess, onSkip }) => {
           returnKeyType="next"
         />
         <TextInput
-          style={[S.playerInput, { marginTop: 10 }]}
+          style={[S.playerInput, { flex: undefined, height: 50, marginRight: 0, marginTop: 10 }]}
           value={password}
           onChangeText={setPassword}
           placeholder="Password (6+ characters)"
@@ -1710,7 +1710,7 @@ export const CounterWindowScreen = ({ player, counterCards, onPlay, onSkip }) =>
           }}
           style={{ marginTop: 20, opacity: selected ? 1 : 0.4 }}
         />
-        <Btn label="Skip — make my argument" variant="secondary" onPress={doSkip} />
+        <Btn label="Skip. Make my argument." variant="secondary" onPress={doSkip} />
       </ScrollView>
     </View>
   );
@@ -1845,7 +1845,7 @@ export const HazardWindowScreen = ({ arguer, hazardPlayer, hazardCards = [], haz
         ))}
 
         <Btn
-          label={selected ? `⚡  PLAY ${selected.name}` : 'Skip — no hazard this turn'}
+          label={selected ? `⚡  PLAY ${selected.name}` : 'Skip. No hazard this turn.'}
           onPress={() => confirmPick(selected)}
           variant={selected ? 'primary' : 'secondary'}
           style={{ marginTop: 20 }}
@@ -1994,7 +1994,7 @@ export const ExchangeScreen = ({ player, hand = [], onDone }) => {
       ))}
 
       <Btn
-        label={selectedCard ? '↺  CONFIRM EXCHANGE' : 'Skip — keep my hand'}
+        label={selectedCard ? '↺  CONFIRM EXCHANGE' : 'Skip. Keep my hand.'}
         onPress={() => onDone(selectedCard ? 'exchange' : 'skip', selectedCard)}
         style={{ marginTop: 16 }}
       />
@@ -2456,7 +2456,7 @@ const DrillRunner = ({ drill, card, onComplete, onBack }) => {
         <View style={S.backConfirmOverlay}>
           <View style={S.backConfirmBox}>
             <Text style={[S.screenTitle, { marginBottom: 10 }]}>Leave this drill?</Text>
-            <Text style={[S.hint, { marginBottom: 24 }]}>Progress is saved — you can pick up where you left off.</Text>
+            <Text style={[S.hint, { marginBottom: 24 }]}>Progress is saved. Pick up where you left off.</Text>
             <Btn label="LEAVE" onPress={onBack} style={{ marginBottom: 4 }} />
             <TouchableOpacity onPress={() => setShowLeave(false)} style={{ paddingVertical: 12 }}>
               <Text style={{ color: C.muted, fontSize: 14, fontWeight: '700' }}>Stay in drill</Text>

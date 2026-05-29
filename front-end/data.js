@@ -103,11 +103,13 @@ export function dealCards(historyLength, count = 2) {
   return arr.slice(0, n);
 }
 
-// ── Remote cards (dynamic case cards via CDN) ─────────────────────────────
-// Fetches JSON from EXPO_PUBLIC_REMOTE_CARDS_URL and caches it in AsyncStorage
-// for 24 hours. Returns the parsed object or null on failure.
+// ── Remote cards ──────────────────────────────────────────────────────────
+// Fetches active case cards from the back-end API and caches them for 24h.
+// Falls back to EXPO_PUBLIC_REMOTE_CARDS_URL if set (legacy / CDN override).
+// Returns the parsed payload or null on failure.
 const REMOTE_CACHE_KEY = 'remote_cards_cache_v1';
 const REMOTE_CACHE_TTL = 24 * 60 * 60 * 1000;
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4001';
 
 export async function fetchRemoteCards() {
   try {
@@ -118,8 +120,7 @@ export async function fetchRemoteCards() {
     }
   } catch (_) {}
 
-  const url = process.env.EXPO_PUBLIC_REMOTE_CARDS_URL;
-  if (!url) return null;
+  const url = process.env.EXPO_PUBLIC_REMOTE_CARDS_URL || `${API_BASE}/api/cards`;
 
   try {
     const res = await fetch(url);
