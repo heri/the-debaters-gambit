@@ -4,7 +4,7 @@ defmodule DebaterGambitWeb.Admin.CardsHTML do
   @difficulties ~w(EASY MEDIUM HARD)
 
   defp layout(assigns, do: inner) do
-    assigns = assign(assigns, :inner, inner)
+    assigns = Map.put(assigns, :inner, inner)
 
     ~H"""
     <!DOCTYPE html>
@@ -145,7 +145,7 @@ defmodule DebaterGambitWeb.Admin.CardsHTML do
   end
 
   def new(assigns) do
-    assigns = assign_new(assigns, :difficulties, fn -> @difficulties end)
+    assigns = Map.put_new(assigns, :difficulties, @difficulties)
 
     ~H"""
     <%= layout assigns do %>

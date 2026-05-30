@@ -16,11 +16,11 @@ const { width: SCREEN_W } = Dimensions.get('window');
 // ── History helpers ────────────────────────────────────────────────────────
 // Determine the current player's result for a saved game entry.
 // myName = players[0].name (first registered player = "you").
-const getResult = (h, myName) => {
+export const getResult = (h, myName) => {
   if (!myName || !h.winner) return null;
   return h.winner === myName ? 'WIN' : 'LOSS';
 };
-const resultColor = r => r === 'WIN' ? '#4ADE80' : r === 'LOSS' ? '#FC8181' : '#F5C842';
+export const resultColor = r => r === 'WIN' ? '#4ADE80' : r === 'LOSS' ? '#FC8181' : '#F5C842';
 
 const HistoryEntry = ({ item, myName }) => {
   const result = getResult(item, myName);
@@ -48,7 +48,7 @@ const HistoryEntry = ({ item, myName }) => {
 // ── Onboarding: 3-page intro carousel shown on first launch ───────────────
 // onDone(): called when the user taps through all 3 pages
 
-const ONBOARDING_PAGES = [
+export const ONBOARDING_PAGES = [
   {
     eyebrow: 'WELCOME TO',
     title: 'THE DEBATER\'S\nGAMBIT',

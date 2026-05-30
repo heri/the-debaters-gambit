@@ -1,0 +1,46 @@
+# Scenario: New user views 2 onboarding screens then skips to account creation.
+# Run: maestro test e2e/onboarding_new_user.yaml
+# Requires: app built with EAS (iOS: com.studiozenkai.debatersgambit)
+# or launched in Expo Go (use appId: host.exp.Exponent and open the project first).
+
+appId: com.studiozenkai.debatersgambit
+---
+- launchApp:
+    clearState: true
+
+# ── Page 1: Welcome ──────────────────────────────────────────────────────────
+- assertVisible:
+    text: "WELCOME TO"
+- assertVisible:
+    text: "THE DEBATER'S"
+- tapOn:
+    text: "NEXT"
+
+# ── Page 2: What You'll Learn ────────────────────────────────────────────────
+- assertVisible:
+    text: "WHAT YOU'LL LEARN"
+- assertVisible:
+    text: "REAL SKILLS"
+
+# Stop here after 2 screens — user taps through to the third
+- tapOn:
+    text: "NEXT"
+
+# ── Page 3: How It Works ────────────────────────────────────────────────────
+- assertVisible:
+    text: "HOW IT WORKS"
+- assertVisible:
+    text: "THREE STEPS"
+
+- tapOn:
+    text: "LET'S BEGIN"
+
+# ── Auth screen — skip to app ────────────────────────────────────────────────
+- assertVisible:
+    text: "SKIP"
+- tapOn:
+    text: "SKIP"
+
+# ── Landed in the main app ───────────────────────────────────────────────────
+- assertVisible:
+    text: "Home"

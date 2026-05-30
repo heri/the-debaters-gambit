@@ -380,6 +380,23 @@ All protected routes require `Authorization: Bearer <token>` header.
 
 Stats are tracked for **hazard** and **move** cards only. Joker, filibuster, and delegate cards are intentionally excluded.
 
+## Testing
+
+**Bug fix:** run tests before and after — all must pass.
+**New feature:** write tests alongside the feature code — all must pass before the task is done.
+
+Coverage targets: **85%+ statements/branches/functions/lines** on front-end and back-end. See [TESTING.md](TESTING.md) for the full guide.
+
+```bash
+# Front-end
+cd front-end && npx jest --coverage
+
+# Back-end
+cd back-end && mix test
+```
+
+---
+
 ## Building for TestFlight
 
 ```bash

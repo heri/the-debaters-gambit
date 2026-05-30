@@ -1,0 +1,62 @@
+# Scenario: Active user starts Quick Draw, plays 2 cards (tap + confirm twice), then exits.
+# Pre-condition: app is past onboarding; at least 2 players added.
+
+appId: com.studiozenkai.debatersgambit
+---
+- launchApp:
+    clearState: false
+
+# Skip onboarding if present
+- runFlow:
+    when:
+      visible:
+        text: "WELCOME TO"
+    commands:
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "LET'S BEGIN"
+      - tapOn:
+          text: "SKIP"
+
+# ── Navigate to Home tab ────────────────────────────────────────────────────
+- tapOn:
+    text: "Home"
+- assertVisible:
+    text: "TODAY'S QUICK DRAW"
+
+# ── Start Quick Draw ─────────────────────────────────────────────────────────
+- tapOn:
+    text: "START QUICK DRAW"
+- assertVisible:
+    text: "QUICK DRAW"
+- assertVisible:
+    text: "0/3 CARDS USED"
+
+# ── Play card 1: tap first card, then confirm ─────────────────────────────────
+- tapOn:
+    index: 0
+    text: "Tap a card to use it"
+- waitForAnimationToEnd
+- tapOn:
+    text: "CONFIRM: I USED THIS CARD"
+- assertVisible:
+    text: "1/3 CARDS USED"
+
+# ── Play card 2: tap second card, then confirm ────────────────────────────────
+- tapOn:
+    index: 0
+    text: "Tap a card to use it"
+- waitForAnimationToEnd
+- tapOn:
+    text: "CONFIRM: I USED THIS CARD"
+- assertVisible:
+    text: "2/3 CARDS USED"
+
+# ── Exit before completing the third card ────────────────────────────────────
+- tapOn:
+    text: "Exit Draw"
+- assertVisible:
+    text: "TODAY'S QUICK DRAW"

@@ -1,0 +1,53 @@
+# Scenario: Active logged-in user signs in and resumes drills where they left off.
+# Pre-condition: user has at least one completed drill saved in the back-end.
+
+appId: com.studiozenkai.debatersgambit
+---
+- launchApp:
+    clearState: false
+
+# If onboarding has not been seen, skip it
+- runFlow:
+    when:
+      visible:
+        text: "WELCOME TO"
+    commands:
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "LET'S BEGIN"
+
+# ── Sign in ──────────────────────────────────────────────────────────────────
+- runFlow:
+    when:
+      visible:
+        text: "SKIP"
+    commands:
+      - tapOn:
+          text: "SIGN IN"
+      - tapOn:
+          id: "email"
+      - inputText: "heri@studiozenkai.com"
+      - tapOn:
+          id: "password"
+      - inputText: "testpassword"
+      - tapOn:
+          text: "SIGN IN"
+
+# ── Navigate to Dojo tab ─────────────────────────────────────────────────────
+- tapOn:
+    text: "Dojo"
+- assertVisible:
+    text: "Dojo"
+
+# ── Drills are shown, at least one is marked as completed ────────────────────
+- assertVisible:
+    text: "The Fair Play"
+
+# ── Tap a completed or available drill to resume ─────────────────────────────
+- tapOn:
+    text: "The Fair Play"
+- assertVisible:
+    text: "NEXT"

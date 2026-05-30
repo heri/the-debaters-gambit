@@ -33,7 +33,8 @@
       "node_modules/(?!(expo|@expo|react-native|@react-native)/)"
     ],
     "moduleNameMapper": {
-      "^react-native$": "<rootDir>/__mocks__/react-native.js"
+      "^react-native$": "<rootDir>/__mocks__/react-native.js",
+      "\\.(png|jpg|jpeg|gif|svg|webp)$": "<rootDir>/__mocks__/fileMock.js"
     },
     "testPathIgnorePatterns": [
       "/node_modules/"

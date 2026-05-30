@@ -7,6 +7,26 @@ import { C, S } from './styles';
 
 const { width } = Dimensions.get('window');
 
+// ── Pure helpers (exported for testing) ────────────────────────────────────
+
+export const cardBadgeText = (card) => {
+  if (card.cardType === 'hazard')     return 'HAZARD CARD  ·  CHAOS';
+  if (card.cardType === 'counter')    return 'COUNTER CARD  ·  INTERRUPT';
+  if (card.cardType === 'joker')      return 'JOKER CARD  ·  HAZARD CANCEL';
+  if (card.cardType === 'filibuster') return 'FILIBUSTER CARD  ·  SKIP TURN';
+  if (card.cardType === 'delegate')   return 'DELEGATE CARD  ·  PASS TURN';
+  return `MOVE CARD  ·  ${card.tier}  ·  ${card.tierLabel}`;
+};
+
+export const handBadgeText = (card) => {
+  if (card.cardType === 'hazard')     return 'HAZARD';
+  if (card.cardType === 'counter')    return 'COUNTER';
+  if (card.cardType === 'joker')      return 'JOKER';
+  if (card.cardType === 'filibuster') return 'FILIBUSTER';
+  if (card.cardType === 'delegate')   return 'DELEGATE';
+  return `MOVE  ·  ${card.tier}`;
+};
+
 // ── Primitives ─────────────────────────────────────────────────────────────
 
 export const Btn = ({ label, onPress, variant = 'primary', style, disabled }) => (
@@ -41,18 +61,8 @@ export const ToggleRow = ({ label, value, onToggle, pts }) => (
 // ── Card views ─────────────────────────────────────────────────────────────
 
 export const MoveCardView = ({ card, compact }) => {
-  const isHazard     = card.cardType === 'hazard';
-  const isCounter    = card.cardType === 'counter';
-  const isJoker      = card.cardType === 'joker';
-  const isFilibuster = card.cardType === 'filibuster';
-  const isDelegate   = card.cardType === 'delegate';
-  const isSpecial    = isHazard || isCounter || isJoker || isFilibuster || isDelegate;
-  const badgeText = isHazard     ? 'HAZARD CARD  ·  CHAOS'
-                  : isCounter    ? 'COUNTER CARD  ·  INTERRUPT'
-                  : isJoker      ? 'JOKER CARD  ·  HAZARD CANCEL'
-                  : isFilibuster ? 'FILIBUSTER CARD  ·  SKIP TURN'
-                  : isDelegate   ? 'DELEGATE CARD  ·  PASS TURN'
-                  : `MOVE CARD  ·  ${card.tier}  ·  ${card.tierLabel}`;
+  const isSpecial = card.cardType !== 'move';
+  const badgeText = cardBadgeText(card);
   return (
     <View style={[S.card, { backgroundColor: card.bg }, compact && S.cardCompact]}>
       <View style={[S.badge, { borderColor: card.accent }]}>
@@ -241,17 +251,7 @@ export const HandPanel = ({ hand }) => {
   if (hand.length === 0) return null;
 
   const card = hand[clampedIdx];
-  const isHazard     = card.cardType === 'hazard';
-  const isCounter    = card.cardType === 'counter';
-  const isJoker      = card.cardType === 'joker';
-  const isFilibuster = card.cardType === 'filibuster';
-  const isDelegate   = card.cardType === 'delegate';
-  const badgeText = isHazard     ? 'HAZARD'
-                  : isCounter    ? 'COUNTER'
-                  : isJoker      ? 'JOKER'
-                  : isFilibuster ? 'FILIBUSTER'
-                  : isDelegate   ? 'DELEGATE'
-                  : `MOVE  ·  ${card.tier}`;
+  const badgeText = handBadgeText(card);
 
   const prev = () => setIdx(i => Math.max(0, i - 1));
   const next = () => setIdx(i => Math.min(hand.length - 1, i + 1));

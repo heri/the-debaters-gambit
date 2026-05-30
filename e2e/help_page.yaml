@@ -1,0 +1,45 @@
+# Scenario: Active user navigates to the Help screen and reads the content.
+
+appId: com.studiozenkai.debatersgambit
+---
+- launchApp:
+    clearState: false
+
+# Skip onboarding if present
+- runFlow:
+    when:
+      visible:
+        text: "WELCOME TO"
+    commands:
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "LET'S BEGIN"
+      - tapOn:
+          text: "SKIP"
+
+# ── Navigate to Help tab ─────────────────────────────────────────────────────
+- tapOn:
+    text: "Help"
+
+# ── Assert the story intro is visible ───────────────────────────────────────
+- assertVisible:
+    text: "THE TALE OF"
+
+# ── Scroll down to game instructions ────────────────────────────────────────
+- scrollUntilVisible:
+    text: "HOW TO PLAY"
+    direction: DOWN
+
+- assertVisible:
+    text: "HOW TO PLAY"
+
+# ── Scroll further to Quick Draw section ────────────────────────────────────
+- scrollUntilVisible:
+    text: "QUICK DRAW"
+    direction: DOWN
+
+- assertVisible:
+    text: "QUICK DRAW"

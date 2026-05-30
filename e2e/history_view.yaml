@@ -1,0 +1,41 @@
+# Scenario: Active user navigates to Account tab and sees their gaming history.
+# Pre-condition: at least one game has been played and saved.
+
+appId: com.studiozenkai.debatersgambit
+---
+- launchApp:
+    clearState: false
+
+# Skip onboarding if present
+- runFlow:
+    when:
+      visible:
+        text: "WELCOME TO"
+    commands:
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "LET'S BEGIN"
+      - tapOn:
+          text: "SKIP"
+
+# ── Navigate to Account tab ──────────────────────────────────────────────────
+- tapOn:
+    text: "Account"
+- assertVisible:
+    text: "PLAYERS"
+
+# ── Scroll down to History section ───────────────────────────────────────────
+- scrollUntilVisible:
+    text: "HISTORY"
+    direction: DOWN
+
+- assertVisible:
+    text: "HISTORY"
+
+# ── At least one history entry is visible ────────────────────────────────────
+# History entries show the case title and a winner line
+- assertVisible:
+    text: "won"

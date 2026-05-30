@@ -1,0 +1,46 @@
+# Scenario: Active user changes gaming time per player to 3 minutes (180 seconds).
+# Default debate time is 60s. Each tap of "+" increases by 30s.
+# 60 → 90 → 120 → 150 → 180 requires 4 taps of the increase button.
+
+appId: com.studiozenkai.debatersgambit
+---
+- launchApp:
+    clearState: false
+
+# Skip onboarding if present
+- runFlow:
+    when:
+      visible:
+        text: "WELCOME TO"
+    commands:
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "NEXT"
+      - tapOn:
+          text: "LET'S BEGIN"
+      - tapOn:
+          text: "SKIP"
+
+# ── Navigate to Account tab ──────────────────────────────────────────────────
+- tapOn:
+    text: "Account"
+- assertVisible:
+    text: "SETTINGS"
+- assertVisible:
+    text: "DEBATE TIME"
+
+# ── Increase debate time 4 times to reach 03:00 ──────────────────────────────
+# The stepper "+" button sits next to the current time value
+- tapOn:
+    text: "+"
+- tapOn:
+    text: "+"
+- tapOn:
+    text: "+"
+- tapOn:
+    text: "+"
+
+# ── Assert 3-minute value is shown ───────────────────────────────────────────
+- assertVisible:
+    text: "03:00"

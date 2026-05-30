@@ -15,6 +15,7 @@ import {
   sortedCases,
   DEFAULT_DEBATE_SECS,
 } from '../data';
+import { JOKER_CARDS, FILIBUSTER_CARDS, DELEGATE_CARDS } from '../cards';
 
 // ── formatTime ─────────────────────────────────────────────────────────────
 
@@ -273,7 +274,7 @@ describe('dealCards', () => {
   });
   test('each card has cardType field', () => {
     dealCards(0, 4).forEach(c => {
-      expect(['move', 'hazard', 'counter']).toContain(c.cardType);
+      expect(['move', 'hazard', 'counter', 'joker', 'filibuster', 'delegate']).toContain(c.cardType);
     });
   });
   test('does not mutate source arrays', () => {
@@ -373,8 +374,11 @@ describe('COUNTER_CARDS integrity', () => {
 // ── ALL_PLAY_CARDS integrity ───────────────────────────────────────────────
 
 describe('ALL_PLAY_CARDS', () => {
-  test('contains all move, hazard, and counter cards', () => {
-    expect(ALL_PLAY_CARDS.length).toBe(MOVE_CARDS.length + HAZARD_CARDS.length + COUNTER_CARDS.length);
+  test('contains all move, hazard, counter, joker, filibuster, and delegate cards', () => {
+    expect(ALL_PLAY_CARDS.length).toBe(
+      MOVE_CARDS.length + HAZARD_CARDS.length + COUNTER_CARDS.length +
+      JOKER_CARDS.length + FILIBUSTER_CARDS.length + DELEGATE_CARDS.length
+    );
   });
   test('all IDs are unique', () => {
     const ids = ALL_PLAY_CARDS.map(c => c.id);
