@@ -25,6 +25,7 @@
         "backgroundColor": "#0D0F1C"
       }
     },
+    "plugins": ["./withSwift5Pods"],
     "extra": {
       "eas": {
         "projectId": "a2fc55f9-c476-4d25-a554-783a56d13f10"
